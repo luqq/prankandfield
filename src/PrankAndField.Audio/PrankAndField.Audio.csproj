@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Audio</RootNamespace>
+    <Description>Music, robotic-voice songs and sound-effect definitions for Prank &amp; Field, plus the cue sequencer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PrankAndField.Core\PrankAndField.Core.csproj" />
+  </ItemGroup>
+</Project>

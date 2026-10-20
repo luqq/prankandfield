@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PrankAndField.Core/PrankAndField.Core.csproj" />
+    <Project Path="src/PrankAndField.Engine/PrankAndField.Engine.csproj" />
+    <Project Path="src/PrankAndField.Audio/PrankAndField.Audio.csproj" />
+    <Project Path="src/PrankAndField.UI/PrankAndField.UI.csproj" />
+    <Project Path="src/PrankAndField.Web/PrankAndField.Web.csproj" />
+    <Project Path="src/PrankAndField.Desktop/PrankAndField.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PrankAndField.Core.Tests/PrankAndField.Core.Tests.csproj" />
+    <Project Path="tests/PrankAndField.Engine.Tests/PrankAndField.Engine.Tests.csproj" />
+    <Project Path="tests/PrankAndField.Audio.Tests/PrankAndField.Audio.Tests.csproj" />
+  </Folder>
+</Solution>

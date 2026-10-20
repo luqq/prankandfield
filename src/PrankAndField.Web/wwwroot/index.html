@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Prank &amp; Field</title>
+    <base href="/" />
+    <link href="_content/PrankAndField.UI/prankandfield.css" rel="stylesheet" />
+    <style>
+        html, body { margin: 0; height: 100%; background: #06070c; color: #e8e8e8; font-family: "Segoe UI", system-ui, sans-serif; }
+        #app { height: 100%; }
+        .paf-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; }
+        .paf-loading h1 { color: #f8e858; letter-spacing: 0.2em; margin: 0; }
+        .paf-loading .bar { width: 240px; height: 8px; border: 1px solid #40e8e8; }
+        .paf-loading .bar div { height: 100%; width: var(--blazor-load-percentage, 0%); background: #40e8e8; transition: width .2s; }
+        #blazor-error-ui { background: #e03838; color: #fff; bottom: 0; display: none; left: 0; padding: .6rem 1.25rem; position: fixed; width: 100%; z-index: 1000; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="paf-loading">
+            <h1>PRANK &amp; FIELD</h1>
+            <div class="bar"><div></div></div>
+            <small>Loading .NET WebAssembly…</small>
+        </div>
+    </div>
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Web</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableCompression>true</BlazorEnableCompression>
+    <WasmEnableSIMD>true</WasmEnableSIMD>
+    <!-- Set RunAOTCompilation=true for a much faster (but slower to build) release build. -->
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <Description>Browser host (Blazor WebAssembly) for Prank &amp; Field.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.*" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PrankAndField.UI\PrankAndField.UI.csproj" />
+  </ItemGroup>
+
+</Project>

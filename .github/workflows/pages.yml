@@ -1,0 +1,73 @@
+name: Publish web build to GitHub Pages
+
+# Builds the Blazor WebAssembly host on every push to main (after running the test suites)
+# and deploys the static output to GitHub Pages.
+#
+# One-time setup in the repository: Settings -> Pages -> "Build and deployment" -> Source: GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET (version pinned by global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install the WebAssembly workload
+        run: dotnet workload install wasm-tools
+
+      - name: Restore
+        run: dotnet restore PrankAndField.slnx
+
+      - name: Test
+        run: dotnet test PrankAndField.slnx --no-restore --configuration Release
+
+      - name: Publish the web host
+        run: dotnet publish src/PrankAndField.Web/PrankAndField.Web.csproj --no-restore --configuration Release --output publish
+
+      - name: Adjust the base path for the Pages URL
+        # Project sites live under https://<owner>.github.io/<repo>/, user sites under the root.
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          if [ "${REPO,,}" = "${OWNER,,}.github.io" ]; then BASE="/"; else BASE="/${REPO}/"; fi
+          echo "Base href: ${BASE}"
+          sed -i "s|<base href=\"/\" />|<base href=\"${BASE}\" />|" publish/wwwroot/index.html
+          # Blazor assets live in _framework; stop Jekyll from hiding underscore folders.
+          touch publish/wwwroot/.nojekyll
+          # Deep links and reloads fall back to the app.
+          cp publish/wwwroot/index.html publish/wwwroot/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

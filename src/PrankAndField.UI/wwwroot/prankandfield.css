@@ -1,0 +1,103 @@
+.paf-root {
+  --paf-bg: #06070c;
+  --paf-fg: #e8e8e8;
+  --paf-accent: #40e8e8;
+  --paf-red: #e03838;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  background: var(--paf-bg);
+  color: var(--paf-fg);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.paf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #111522;
+  border-bottom: 2px solid var(--paf-red);
+}
+
+.paf-brand {
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #f8e858;
+  flex: 1;
+}
+
+.paf-lang select {
+  background: #06070c;
+  color: var(--paf-fg);
+  border: 1px solid var(--paf-accent);
+  padding: 3px 6px;
+  font-size: 14px;
+}
+
+.paf-btn {
+  background: #06070c;
+  color: var(--paf-fg);
+  border: 1px solid var(--paf-accent);
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.paf-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: #000;
+}
+
+.paf-canvas {
+  display: block;
+  outline: none;
+  image-rendering: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.paf-touch {
+  display: none;
+  gap: 8px;
+  padding: 8px;
+  background: #111522;
+}
+
+.paf-touch-btn {
+  flex: 1;
+  padding: 18px 0;
+  font-size: 16px;
+  font-weight: 700;
+  background: #1c2238;
+  color: var(--paf-fg);
+  border: 2px solid var(--paf-accent);
+  border-radius: 10px;
+}
+
+.paf-touch-btn:active,
+.paf-touch-btn.is-down {
+  background: var(--paf-accent);
+  color: #000;
+}
+
+.paf-touch-action { border-color: #f8e858; }
+.paf-touch-start { flex: 0.6; border-color: var(--paf-red); }
+
+@media (pointer: coarse) {
+  .paf-touch { display: flex; }
+}
+
+.paf-root:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}

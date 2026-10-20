@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Core</RootNamespace>
+    <Description>Game logic for Prank &amp; Field: events, physics, rules, records and localization. No rendering dependencies.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Resources\*.json" LogicalName="PrankAndField.Core.Localization.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

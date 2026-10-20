@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Engine</RootNamespace>
+    <Description>Vector rendering engine for Prank &amp; Field: retained draw list, pixel-style vector font, athlete sprites and stadium scenes. Backend-agnostic.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PrankAndField.Core\PrankAndField.Core.csproj" />
+  </ItemGroup>
+</Project>

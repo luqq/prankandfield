@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/PrankAndField.Web/PrankAndField.Web.csproj", "--launch-profile", "PrankAndField.Web"],
+      "port": 5173,
+      "url": "http://localhost:5173"
+    }
+  ]
+}

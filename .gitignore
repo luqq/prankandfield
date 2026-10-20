@@ -1,0 +1,59 @@
+## Directorios de compilación y artefactos
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+build/
+dist/
+
+## Configuración y caches de usuario / IDEs
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Paquetes NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+
+## Secretos locales y configuraciones de entorno
+appsettings*.Development.json
+appsettings*.Local.json
+*.env
+*.env.*
+!.env.example
+secrets.json
+
+## Publicaciones y despliegues
+publish/
+*.azurePubxml
+*.pubxml
+*.publishproj
+
+## Cobertura de código y resultados de pruebas
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+coverage/
+*.coverage
+*.coveragexml
+
+## Crash dumps y profiling
+*.stackdump
+*.dmp
+*.vsp
+*.vspx
+*.sap
