@@ -1,3 +1,6 @@
+@using Microsoft.Extensions.Configuration
 @using PrankAndField.UI
+@inject IConfiguration Configuration
 
-<GameCanvas />
+@* RelayUrl (wwwroot/appsettings.json) is the SignalR hub of the online relay; empty hides the ONLINE button. *@
+<GameCanvas RelayUrl="@Configuration["RelayUrl"]" />

@@ -53,6 +53,23 @@ every push to `main` (or manually from the Actions tab). Enable it once in the r
 *Settings → Pages → Build and deployment → Source: GitHub Actions*. The workflow rewrites `<base href>` to the
 repository path, adds `.nojekyll` so the `_framework` folder is served, and copies `index.html` to `404.html`.
 
+## Online play (branch `main-online`)
+
+The **ONLINE** button in the toolbar opens a room on the relay server (`src/PrankAndField.Server`) and shows a
+five-letter code and an invite link (`?sala=CODE`); the other player types the code or opens the link. Each
+browser is one player (both local control sets move your athlete) and both run the same simulation in lockstep.
+Online matches use their own record board and never touch the local one.
+
+The button only appears when the web host knows the relay: set `RelayUrl` in
+`src/PrankAndField.Web/wwwroot/appsettings.json` (for example `https://paf.example.com/hub`), or add
+`?relay=<hub url>` to the page URL. To try it locally:
+
+```bash
+dotnet run --project src/PrankAndField.Server --urls http://localhost:5000
+dotnet run --project src/PrankAndField.Web
+# open http://localhost:5173/?relay=http://localhost:5000/hub in two browsers
+```
+
 ## Controls
 
 | Action | Player 1 | Player 2 | Gamepad |
