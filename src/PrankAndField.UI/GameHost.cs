@@ -55,12 +55,27 @@ public sealed class GameHost
 
     /// <summary>
     /// Advances the game by <paramref name="dtSeconds"/> with the given input masks, renders a frame and
-    /// returns the encoded draw list followed by pending audio events. When the record board changed,
-    /// an audio-section marker event (kind 9) tells the host to persist <see cref="RecordsJson"/>.
+    /// returns the encoded draw list followed by pending audio events (see <see cref="Present"/>).
     /// </summary>
     public double[] Frame(double dtSeconds, int p1Mask, int p2Mask)
     {
         Game.Advance(dtSeconds, InputFrame.FromMask(p1Mask), InputFrame.FromMask(p2Mask));
+        return Present();
+    }
+
+    /// <summary>
+    /// Runs exactly one fixed tick with the given input masks, without rendering. An online session calls
+    /// this once per tick whose inputs both peers have confirmed, then <see cref="Present"/> once per frame.
+    /// </summary>
+    public void Step(int p1Mask, int p2Mask) => Game.Tick(InputFrame.FromMask(p1Mask), InputFrame.FromMask(p2Mask));
+
+    /// <summary>
+    /// Renders the current state and returns the encoded draw list followed by pending audio events.
+    /// When the record board changed, an audio-section marker event (kind 9) tells the host to persist
+    /// <see cref="RecordsJson"/>.
+    /// </summary>
+    public double[] Present()
+    {
         _sequencer.Drain(Game);
         var dl = _renderer.Render(Game);
         var events = _sequencer.Take();
