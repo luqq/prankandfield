@@ -1,0 +1,77 @@
+name: Publish online build to luqq.github.io/prankandfieldonline
+
+# Builds the Blazor WebAssembly host from main-online (after running the test suites) and pushes the
+# static output to the gh-pages branch of luqq/prankandfieldonline, which serves it at
+# https://luqq.github.io/prankandfieldonline/. The published game from main is left untouched.
+#
+# A repository has a single Pages site, so the online build lives in its own (empty) repository.
+# One-time setup:
+#   1. Create the public repository luqq/prankandfieldonline (it can stay empty).
+#   2. ssh-keygen -t ed25519 -C prankandfieldonline-deploy -f deploy_key -N ""
+#      - luqq/prankandfieldonline -> Settings -> Deploy keys -> Add: deploy_key.pub, "Allow write access".
+#      - luqq/prankandfield -> Settings -> Secrets and variables -> Actions -> New secret
+#        ONLINE_PAGES_DEPLOY_KEY with the contents of deploy_key (the private key).
+#   3. After the first run: luqq/prankandfieldonline -> Settings -> Pages -> Source: Deploy from a branch,
+#      branch gh-pages, folder / (root).
+
+on:
+  push:
+    branches: [main-online]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-online
+  cancel-in-progress: true
+
+env:
+  TARGET_REPOSITORY: luqq/prankandfieldonline
+  BASE_HREF: /prankandfieldonline/
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET (version pinned by global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install the WebAssembly workload
+        run: dotnet workload install wasm-tools
+
+      - name: Restore
+        run: dotnet restore PrankAndField.slnx
+
+      - name: Test
+        run: dotnet test PrankAndField.slnx --no-restore --configuration Release
+
+      - name: Publish the web host
+        run: dotnet publish src/PrankAndField.Web/PrankAndField.Web.csproj --no-restore --configuration Release --output publish
+
+      - name: Adjust the base path for the Pages URL
+        run: |
+          echo "Base href: ${BASE_HREF}"
+          sed -i "s|<base href=\"/\" />|<base href=\"${BASE_HREF}\" />|" publish/wwwroot/index.html
+          grep -q "<base href=\"${BASE_HREF}\" />" publish/wwwroot/index.html
+          # Blazor assets live in _framework; stop Jekyll from hiding underscore folders.
+          touch publish/wwwroot/.nojekyll
+          # Deep links and reloads fall back to the app.
+          cp publish/wwwroot/index.html publish/wwwroot/404.html
+
+      - name: Push to the gh-pages branch of the online repository
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.ONLINE_PAGES_DEPLOY_KEY }}
+          external_repository: ${{ env.TARGET_REPOSITORY }}
+          publish_branch: gh-pages
+          publish_dir: publish/wwwroot
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898283+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Deploy ${{ github.repository }}@${{ github.sha }} (main-online)

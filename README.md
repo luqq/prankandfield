@@ -51,6 +51,11 @@ every push to `main` (or manually from the Actions tab). Enable it once in the r
 *Settings → Pages → Build and deployment → Source: GitHub Actions*. The workflow rewrites `<base href>` to the
 repository path, adds `.nojekyll` so the `_framework` folder is served, and copies `index.html` to `404.html`.
 
+The online work lives on the `main-online` branch. `.github/workflows/pages-online.yml` runs the same build on every
+push to `main-online` and pushes it to the `gh-pages` branch of `luqq/prankandfieldonline`, served at
+<https://luqq.github.io/prankandfieldonline/>. The one-time setup (empty repository, deploy key and secret
+`ONLINE_PAGES_DEPLOY_KEY`, Pages source) is described at the top of the workflow.
+
 ## Controls
 
 | Action | Player 1 | Player 2 | Gamepad |
