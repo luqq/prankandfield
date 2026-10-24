@@ -17,12 +17,14 @@ projects; the same Razor component runs in a browser (Blazor WebAssembly) and in
 | `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]`, a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache), stadium, HUD and all screens. Backend-agnostic. |
 | `src/PrankAndField.Audio` | Songs (notes + syllables), sound ids, voice lines and the cue mapping. Serialized to the JavaScript synthesizer. |
 | `src/PrankAndField.Net` | Online play: deterministic lockstep session (input delay, checksum exchange), wire messages and the transport abstraction, plus an in-memory link for local play and tests. Not wired into the UI yet. |
+| `src/PrankAndField.Net.Client` | SignalR client of the relay: creates or joins a room and exposes the match as an `IGameTransport`. |
+| `src/PrankAndField.Server` | Relay server (ASP.NET Core + SignalR): private rooms by code, forwards inputs and checksums. Docker image for amd64/arm64; see its README. |
 | `src/PrankAndField.UI` | Shared Razor Class Library: the `GameCanvas` component, `GameHost` (composes the three layers) and `prankandfield.js` (canvas backend, Web Audio synth with formant "robot singing", speech announcer, keyboard/gamepad/touch input, persistence). |
 | `src/PrankAndField.Web` | Blazor WebAssembly host (uses `[JSExport]` for a JSON-free frame bridge). |
 | `src/PrankAndField.Desktop` | Desktop host (PhotinoX.Blazor, Blazor Hybrid). |
-| `tests/*` | xUnit suites for Core (physics, every event, full-game runs with a scripted bot, localization completeness), Engine (draw list encoding, font coverage, every screen of a whole game in every language), Audio (songs, cue map, catalog JSON, host frame) and Net (two bots playing a credit over a laggy link, input delay, stalls, desync detection). |
+| `tests/*` | xUnit suites for Core (physics, every event, full-game runs with a scripted bot, localization completeness), Engine (draw list encoding, font coverage, every screen of a whole game in every language), Audio (songs, cue map, catalog JSON, host frame), Net (two bots playing a credit over a laggy link, input delay, stalls, desync detection) and Server (rooms, CORS, two peers in lockstep through the real hub). |
 
-Dependency direction: `Core ← Engine`, `Core ← Audio`, `Core ← Net`, `Core/Engine/Audio ← UI ← Web/Desktop`. Core never references the others.
+Dependency direction: `Core ← Engine`, `Core ← Audio`, `Core ← Net ← Net.Client`, `Server` (standalone), `Core/Engine/Audio ← UI ← Web/Desktop`. Core never references the others.
 
 ## Running
 
