@@ -204,6 +204,18 @@ public sealed class Game
         }
     }
 
+    /// <summary>
+    /// Online match: skips the title menu and starts a two-player credit at name entry. Both peers call it
+    /// on the same tick so their simulations stay in lockstep.
+    /// </summary>
+    public void StartOnlineCredit()
+    {
+        if (!IsOnline) throw new InvalidOperationException("Only online games skip the title.");
+        MenuSelection = 1;
+        PlayerCount = 2;
+        BeginGame();
+    }
+
     private void BeginGame()
     {
         Rng = new Rng(_seed + (uint)(TotalTime * 1000));

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Net</RootNamespace>
+    <Description>Online play for Prank &amp; Field: deterministic lockstep session, wire messages and the transport abstraction. Depends on Core only.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PrankAndField.Core\PrankAndField.Core.csproj" />
+  </ItemGroup>
+</Project>

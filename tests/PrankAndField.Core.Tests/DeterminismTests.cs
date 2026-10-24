@@ -51,6 +51,18 @@ public class DeterminismTests
         Assert.Equal(GameState.Title, online.State);
     }
 
+    [Fact]
+    public void OnlineCreditsStartAtNameEntryForTwoPlayers()
+    {
+        var online = new Game(online: true);
+        online.StartOnlineCredit();
+        Assert.Equal(GameState.NameEntry, online.State);
+        Assert.Equal(2, online.PlayerCount);
+        Assert.Equal(0, online.EntryPlayer);
+
+        Assert.Throws<InvalidOperationException>(() => new Game().StartOnlineCredit());
+    }
+
     /// <summary>Two bots play a credit up to the medal ceremony; returns the masks and checksum of every tick.</summary>
     private static (List<(int P1, int P2)> Masks, List<ulong> Checksums) PlayTwoPlayerCredit(uint seed)
     {
