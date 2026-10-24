@@ -47,14 +47,21 @@ public sealed class Game
     private double _accumulator;
     private readonly uint _seed;
 
-    public Game(Localizer? localizer = null, WorldRecords? records = null, uint seed = 12345)
+    public Game(Localizer? localizer = null, WorldRecords? records = null, uint seed = 12345, bool online = false)
     {
+        IsOnline = online;
         Localizer = localizer ?? new Localizer();
         Records = records ?? new WorldRecords();
         _seed = seed;
         Rng = new Rng(seed);
         EnterTitle();
     }
+
+    /// <summary>
+    /// Online match: both peers run this simulation in lockstep, so the debug key (practice menu,
+    /// which reseeds and changes the player count) is ignored.
+    /// </summary>
+    public bool IsOnline { get; }
 
     public Localizer Localizer { get; }
     public WorldRecords Records { get; }
@@ -177,7 +184,7 @@ public sealed class Game
     {
         var e0 = _edges[0];
         var e1 = _edges[1];
-        if (e0.DebugPressed)
+        if (e0.DebugPressed && !IsOnline)
         {
             SetState(GameState.PracticeMenu);
             Cue(AudioCue.SfxMenuSelect);
@@ -441,5 +448,69 @@ public sealed class Game
         }
         Round = Math.Max(1, round);
         EnterEventIntro(kind);
+    }
+
+    /// <summary>
+    /// Hash of the state that decides the outcome of a credit. Two peers that ran the same ticks with the
+    /// same seed and inputs get the same value; a mismatch means their simulations diverged.
+    /// </summary>
+    public ulong Checksum()
+    {
+        var h = new StateHash();
+        h.Add((int)State);
+        h.Add(StateTime);
+        h.Add(Rng.State);
+        h.Add(Round);
+        h.Add((int)CurrentEvent);
+        h.Add(PlayerCount);
+        h.Add(MenuSelection);
+        h.Add(EntryPlayer);
+        h.Add(EntryCursor);
+        foreach (char c in EntryLetters) h.Add(c);
+        foreach (var p in Players)
+        {
+            h.Add(p.Score);
+            h.Add(p.Chances);
+            h.Add(p.IsOut);
+            h.Add(p.CurrentMark ?? -1);
+            foreach (char c in p.Name) h.Add(c);
+        }
+        if (Simulation is { } sim)
+        {
+            h.Add(sim.Elapsed);
+            h.Add(sim.IsFinished);
+            h.Add(sim.BonusPoints[0]);
+            h.Add(sim.BonusPoints[1]);
+            foreach (var a in sim.Athletes)
+            {
+                h.Add(a.X);
+                h.Add(a.Y);
+                h.Add(a.Runner.SpeedCm);
+                h.Add((int)a.Pose);
+            }
+        }
+        return h.Value;
+    }
+
+    /// <summary>FNV-1a over the raw bits of each value.</summary>
+    private struct StateHash
+    {
+        public ulong Value = 14695981039346656037UL;
+
+        public StateHash() { }
+
+        public void Add(long v)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                Value ^= (byte)(v >> (8 * i));
+                Value *= 1099511628211UL;
+            }
+        }
+
+        public void Add(int v) => Add((long)v);
+        public void Add(uint v) => Add((long)v);
+        public void Add(bool v) => Add(v ? 1L : 0L);
+        public void Add(double v) => Add(BitConverter.DoubleToInt64Bits(v));
     }
 }
