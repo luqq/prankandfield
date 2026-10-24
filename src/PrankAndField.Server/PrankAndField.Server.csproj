@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Server</RootNamespace>
+    <Description>Online relay for Prank &amp; Field: private rooms by code and a SignalR hub that forwards each peer's inputs and checksums to the other.</Description>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+</Project>
