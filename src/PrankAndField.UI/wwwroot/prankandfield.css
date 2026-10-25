@@ -162,7 +162,7 @@
   font-weight: 700;
 }
 
-.paf-online-panel .paf-btn:disabled {
+.paf-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }

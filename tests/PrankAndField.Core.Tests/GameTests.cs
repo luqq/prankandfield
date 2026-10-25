@@ -164,7 +164,7 @@ public class GameTests
     public void HiddenPracticeMenuJumpsToAnyEventAndRound()
     {
         var game = new Game();
-        Press(game, new InputFrame(Debug: true));
+        Press(game, new InputFrame(Konami: true));
         Assert.Equal(GameState.PracticeMenu, game.State);
         Press(game, new InputFrame(Down: true));
         Press(game, new InputFrame(Down: true));
@@ -180,11 +180,58 @@ public class GameTests
         Assert.Equal(3, game.Round);
         Assert.Equal(1, game.PlayerCount);
 
-        // the debug key on the menu goes back to the title
+        // Back on the menu goes back to the title
         var again = new Game();
-        Press(again, new InputFrame(Debug: true));
-        Press(again, new InputFrame(Debug: true));
+        Press(again, new InputFrame(Konami: true));
+        Press(again, new InputFrame(Back: true));
         Assert.Equal(GameState.Title, again.State);
+    }
+
+    [Fact]
+    public void KonamiCodeOnTheTitleOpensThePracticeMenu()
+    {
+        var game = new Game();
+        Assert.False(game.PracticeUsed);
+        Press(game, new InputFrame(Up: true));
+        Press(game, new InputFrame(Up: true));
+        Press(game, new InputFrame(Up: true)); // a stray extra up keeps the attempt going
+        Press(game, new InputFrame(Down: true));
+        Press(game, new InputFrame(Down: true));
+        Press(game, new InputFrame(Left: true));
+        Press(game, new InputFrame(Right: true));
+        Press(game, new InputFrame(Left: true));
+        Press(game, new InputFrame(Right: true));
+        Press(game, new InputFrame(Run2: true));
+        Assert.Equal(GameState.Title, game.State);
+        Press(game, new InputFrame(Run1: true));
+        Assert.Equal(GameState.PracticeMenu, game.State);
+        Assert.True(game.PracticeUsed);
+    }
+
+    [Fact]
+    public void KonamiCodeKeepsThePlayerChoiceAndFinishesWithJump()
+    {
+        var game = new Game();
+        Press(game, new InputFrame(Down: true)); // 2 players
+        Assert.Equal(1, game.MenuSelection);
+        foreach (var f in new[] { new InputFrame(Up: true), new InputFrame(Up: true), new InputFrame(Down: true), new InputFrame(Down: true),
+                     new InputFrame(Left: true), new InputFrame(Right: true), new InputFrame(Left: true), new InputFrame(Right: true),
+                     new InputFrame(Run2: true), new InputFrame(Action: true) })
+            Press(game, f);
+        Assert.Equal(GameState.PracticeMenu, game.State);
+        Assert.Equal(1, game.MenuSelection);
+    }
+
+    [Fact]
+    public void AWrongButtonResetsTheKonamiCode()
+    {
+        var game = new Game();
+        foreach (var f in new[] { new InputFrame(Up: true), new InputFrame(Up: true), new InputFrame(Down: true), new InputFrame(Left: true),
+                     new InputFrame(Down: true), new InputFrame(Left: true), new InputFrame(Right: true), new InputFrame(Left: true),
+                     new InputFrame(Right: true), new InputFrame(Run2: true), new InputFrame(Run1: true) })
+            Press(game, f);
+        Assert.Equal(GameState.Title, game.State);
+        Assert.False(game.PracticeUsed);
     }
 
     [Fact]

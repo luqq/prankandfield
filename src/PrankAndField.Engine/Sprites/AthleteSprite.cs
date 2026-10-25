@@ -20,7 +20,7 @@ public readonly record struct BodyPose(
 public readonly record struct AthleteColors(Rgba Hair, Rgba Shorts, Rgba Singlet, Rgba Skin)
 {
     public static AthleteColors Player1 => new(Palette.HairBrown, Palette.ShortsP1, Palette.Singlet, Palette.Skin);
-    public static AthleteColors Player2 => new(Palette.HairBlack, Palette.ShortsP2, Palette.Singlet, Palette.Skin);
+    public static AthleteColors Player2 => new(Palette.HairBlack, Palette.ShortsP2, Palette.Singlet, Palette.SkinP2);
     public static AthleteColors Cpu => new(Palette.HairBlack, Palette.ShortsP2, Rgba.Hex(0xF8E0A0), Rgba.Hex(0xC89060));
 
     public static AthleteColors For(Athlete a) => a.IsCpu ? Cpu : (a.PlayerIndex == 0 ? Player1 : Player2);
@@ -193,7 +193,7 @@ public static class AthleteSprite
         dl.FillPolygon(Palette.Mustache, mustache);
         // nose
         var nose = ToScreen(headX + 3.3, headY - 0.2);
-        dl.FillCircle(nose.X, nose.Y, 0.7 * scale, Palette.SkinShade);
+        dl.FillCircle(nose.X, nose.Y, 0.7 * scale, colors.Skin.Darker(0.88));
 
         // --- near arm ---
         DrawArm(dl, ToScreen, Dir, shX + 0.6, shY, pose.ArmNear, pose.ElbowNear, colors.Skin, scale);

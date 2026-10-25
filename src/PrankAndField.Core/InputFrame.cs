@@ -13,7 +13,8 @@ public readonly record struct InputFrame(
     bool Down = false,
     bool Left = false,
     bool Right = false,
-    bool Debug = false)
+    bool Konami = false,
+    bool Back = false)
 {
     public const int Run1Bit = 1;
     public const int Run2Bit = 2;
@@ -24,8 +25,14 @@ public readonly record struct InputFrame(
     public const int LeftBit = 64;
     public const int RightBit = 128;
 
-    /// <summary>Hidden developer key: opens the practice menu from the title.</summary>
-    public const int DebugBit = 256;
+    /// <summary>
+    /// Pulse sent by a host that recognised the Konami code on raw keys (the keyboard layout splits the arrows
+    /// between both players, so <see cref="KonamiCode"/> cannot see it on one seat). Opens the practice menu.
+    /// </summary>
+    public const int KonamiBit = 256;
+
+    /// <summary>Leaves the practice menu (Esc on the keyboard, Back/Select on a gamepad).</summary>
+    public const int BackBit = 512;
 
     public static readonly InputFrame None = new();
 
@@ -38,11 +45,12 @@ public readonly record struct InputFrame(
         (mask & DownBit) != 0,
         (mask & LeftBit) != 0,
         (mask & RightBit) != 0,
-        (mask & DebugBit) != 0);
+        (mask & KonamiBit) != 0,
+        (mask & BackBit) != 0);
 
     public int ToMask() =>
         (Run1 ? Run1Bit : 0) | (Run2 ? Run2Bit : 0) | (Action ? ActionBit : 0) | (Start ? StartBit : 0) |
-        (Up ? UpBit : 0) | (Down ? DownBit : 0) | (Left ? LeftBit : 0) | (Right ? RightBit : 0) | (Debug ? DebugBit : 0);
+        (Up ? UpBit : 0) | (Down ? DownBit : 0) | (Left ? LeftBit : 0) | (Right ? RightBit : 0) | (Konami ? KonamiBit : 0) | (Back ? BackBit : 0);
 
     public bool AnyRun => Run1 || Run2;
 }
@@ -62,7 +70,8 @@ public sealed class ButtonEdges
     public bool DownPressed { get; private set; }
     public bool LeftPressed { get; private set; }
     public bool RightPressed { get; private set; }
-    public bool DebugPressed { get; private set; }
+    public bool KonamiPressed { get; private set; }
+    public bool BackPressed { get; private set; }
 
     public bool ActionHeld => Current.Action;
     public bool AnyRunPressed => Run1Pressed || Run2Pressed;
@@ -79,7 +88,8 @@ public sealed class ButtonEdges
         DownPressed = frame.Down && !_prev.Down;
         LeftPressed = frame.Left && !_prev.Left;
         RightPressed = frame.Right && !_prev.Right;
-        DebugPressed = frame.Debug && !_prev.Debug;
+        KonamiPressed = frame.Konami && !_prev.Konami;
+        BackPressed = frame.Back && !_prev.Back;
         _prev = frame;
         Current = frame;
     }
@@ -89,6 +99,6 @@ public sealed class ButtonEdges
         _prev = default;
         Current = default;
         Run1Pressed = Run2Pressed = ActionPressed = ActionReleased = StartPressed = false;
-        UpPressed = DownPressed = LeftPressed = RightPressed = DebugPressed = false;
+        UpPressed = DownPressed = LeftPressed = RightPressed = KonamiPressed = BackPressed = false;
     }
 }

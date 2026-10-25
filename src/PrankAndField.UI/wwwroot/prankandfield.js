@@ -7,7 +7,7 @@ const LOGICAL_W = 256;
 const LOGICAL_H = 224;
 const ASSEMBLY = "PrankAndField.UI";
 
-const BIT = { run1: 1, run2: 2, action: 4, start: 8, up: 16, down: 32, left: 64, right: 128, debug: 256 };
+const BIT = { run1: 1, run2: 2, action: 4, start: 8, up: 16, down: 32, left: 64, right: 128, konami: 256, back: 512 };
 
 const state = {
   canvas: null,
@@ -26,6 +26,8 @@ const state = {
   latch1: 0,
   latch2: 0,
   latchTouch: 0,
+  konamiStep: 0,
+  konamiUntil: 0,
   resizeObserver: null,
   listeners: [],
   fps: { frames: 0, last: 0 },
@@ -168,7 +170,8 @@ async function loop(ts) {
   if (!state.running) return;
   const dt = Math.min(0.1, Math.max(0, (ts - state.lastTs) / 1000));
   state.lastTs = ts;
-  const p1 = state.p1 | state.latch1 | state.touch | state.latchTouch | gamepadMask(0);
+  const konami = performance.now() < state.konamiUntil ? BIT.konami : 0;
+  const p1 = state.p1 | state.latch1 | state.touch | state.latchTouch | gamepadMask(0) | konami;
   const p2 = state.p2 | state.latch2 | gamepadMask(1);
   state.latch1 = 0;
   state.latch2 = 0;
@@ -356,13 +359,27 @@ function listen(target, type, fn, opts) {
 const KEYMAP_P1 = {
   KeyZ: BIT.run1, KeyX: BIT.run2, Space: BIT.action, Enter: BIT.start, Digit1: BIT.start, Numpad1: BIT.start,
   ArrowUp: BIT.up, ArrowDown: BIT.down, KeyW: BIT.up, KeyS: BIT.down, KeyA: BIT.left, KeyD: BIT.right,
-  KeyP: BIT.debug, F2: BIT.debug, // hidden practice menu
+  Escape: BIT.back, Backspace: BIT.back, // leave the practice menu
 };
 const KEYMAP_P2 = {
   ArrowLeft: BIT.run1, ArrowRight: BIT.run2, ArrowUp: BIT.action, Digit2: BIT.start, Numpad2: BIT.start,
   KeyN: BIT.run1, KeyM: BIT.run2, ShiftRight: BIT.action, ControlRight: BIT.action,
 };
-const PREVENT = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"]);
+const PREVENT = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Backspace"]);
+
+// The arrows are split between both players on the keyboard, so the Konami code (which opens the
+// practice menu) is read here from the raw keys and sent to the game as a short pulse.
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
+const KONAMI_PULSE_MS = 150;
+
+function trackKonami(code) {
+  if (code === KONAMI[state.konamiStep]) state.konamiStep++;
+  else state.konamiStep = code === "ArrowUp" ? (state.konamiStep === 2 ? 2 : 1) : 0;
+  if (state.konamiStep === KONAMI.length) {
+    state.konamiStep = 0;
+    state.konamiUntil = performance.now() + KONAMI_PULSE_MS;
+  }
+}
 
 function installInput() {
   const onKey = (down) => (e) => {
@@ -372,6 +389,7 @@ function installInput() {
     if (m1) { state.p1 = down ? (state.p1 | m1) : (state.p1 & ~m1); if (down) state.latch1 |= m1; handled = true; }
     const m2 = KEYMAP_P2[e.code];
     if (m2) { state.p2 = down ? (state.p2 | m2) : (state.p2 & ~m2); if (down) state.latch2 |= m2; handled = true; }
+    if (down && !e.repeat) trackKonami(e.code);
     if (handled) {
       if (down && !e.repeat) state.audio.unlock();
       if (PREVENT.has(e.code)) e.preventDefault();
@@ -407,6 +425,7 @@ function gamepadMask(index) {
   if (b(0)) m |= BIT.run1;
   if (b(1)) m |= BIT.run2;
   if (b(2) || b(3) || b(5) || b(7)) m |= BIT.action;
+  if (b(8)) m |= BIT.back;
   if (b(9)) m |= BIT.start;
   if (b(12)) m |= BIT.up;
   if (b(13)) m |= BIT.down;

@@ -53,7 +53,8 @@ public static class Palette
 
     // athletes
     public static readonly Rgba Skin = Rgba.Hex(0xF2C4A0);
-    public static readonly Rgba SkinShade = Rgba.Hex(0xD9A880);
+    /// <summary>Player 2 has a darker skin tone, like the second runner of the arcade original.</summary>
+    public static readonly Rgba SkinP2 = Rgba.Hex(0x9C5C34);
     public static readonly Rgba HairBrown = Rgba.Hex(0x4A2A12);
     public static readonly Rgba HairBlack = Rgba.Hex(0x1A1A1A);
     public static readonly Rgba Mustache = Rgba.Hex(0x30200A);
