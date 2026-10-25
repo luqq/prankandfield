@@ -42,6 +42,7 @@ public sealed class Game
     public const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.!?";
 
     private readonly ButtonEdges[] _edges = [new ButtonEdges(), new ButtonEdges()];
+    private readonly KonamiCode _konami = new();
     private readonly Queue<AudioCue> _cues = new();
     private readonly Queue<MarkAnnouncement> _marks = new();
     private double _accumulator;
@@ -58,7 +59,7 @@ public sealed class Game
     }
 
     /// <summary>
-    /// Online match: both peers run this simulation in lockstep, so the debug key (practice menu,
+    /// Online match: both peers run this simulation in lockstep, so the Konami code (practice menu,
     /// which reseeds and changes the player count) is ignored.
     /// </summary>
     public bool IsOnline { get; }
@@ -85,9 +86,17 @@ public sealed class Game
     /// <summary>Title menu: 0 = 1 player, 1 = 2 players.</summary>
     public int MenuSelection { get; private set; }
 
-    /// <summary>Hidden practice menu selection (opened with the debug key on the title).</summary>
+    /// <summary>Hidden practice menu selection (opened with the Konami code on the title).</summary>
     public EventKind PracticeEvent { get; private set; } = EventKind.Dash100m;
+
+    /// <summary>Target chosen on the practice menu: the round whose qualifying marks apply. Kept for the session.</summary>
     public int PracticeRound { get; private set; } = 1;
+
+    /// <summary>
+    /// Set once the practice menu was opened or a practice jump ran. Hosts keep online play locked from then
+    /// on, until the page is reloaded or the game restarted, so tuned targets never reach a match.
+    /// </summary>
+    public bool PracticeUsed { get; private set; }
 
     /// <summary>Spoken mark announcements produced by the events (dequeued by the audio layer).</summary>
     public bool TryDequeueMark(out MarkAnnouncement mark) => _marks.TryDequeue(out mark);
@@ -166,7 +175,7 @@ public sealed class Game
         if (e.UpPressed || e.Run1Pressed) { PracticeEvent = (EventKind)(((int)PracticeEvent + count - 1) % count); Cue(AudioCue.SfxMenuMove); }
         if (e.RightPressed) { PracticeRound = Math.Min(Rules.MaxRound, PracticeRound + 1); Cue(AudioCue.SfxMenuMove); }
         if (e.LeftPressed) { PracticeRound = Math.Max(1, PracticeRound - 1); Cue(AudioCue.SfxMenuMove); }
-        if (e.DebugPressed) { EnterTitle(); return; }
+        if (e.BackPressed || e.KonamiPressed) { EnterTitle(); return; }
         if (e.StartPressed || e.ActionPressed)
         {
             Cue(AudioCue.SfxMenuSelect);
@@ -188,6 +197,7 @@ public sealed class Game
     {
         Simulation = null;
         Outcomes = [];
+        _konami.Reset();
         SetState(GameState.Title);
         Cue(AudioCue.SongTitle);
         Cue(AudioCue.VoiceTitle);
@@ -197,11 +207,18 @@ public sealed class Game
     {
         var e0 = _edges[0];
         var e1 = _edges[1];
-        if (e0.DebugPressed && !IsOnline)
+        if (!IsOnline)
         {
-            SetState(GameState.PracticeMenu);
-            Cue(AudioCue.SfxMenuSelect);
-            return;
+            bool typed = _konami.Feed(e0);
+            if (typed || e0.KonamiPressed)
+            {
+                // Typing the code flips the 1P/2P choice five times (four directions and B): undo the odd one.
+                if (typed) MenuSelection = 1 - MenuSelection;
+                PracticeUsed = true;
+                SetState(GameState.PracticeMenu);
+                Cue(AudioCue.SfxMenuSelect);
+                return;
+            }
         }
         if (e0.UpPressed || e0.DownPressed || e0.Run1Pressed || e0.Run2Pressed || e1.UpPressed || e1.DownPressed)
         {
@@ -501,6 +518,7 @@ public sealed class Game
     /// </summary>
     public void JumpToEvent(EventKind kind, int round = 1, int players = 1)
     {
+        PracticeUsed = true;
         PlayerCount = Math.Clamp(players, 1, 2);
         Rng = new Rng(_seed + (uint)(TotalTime * 1000) + 1);
         for (int i = 0; i < Players.Length; i++)

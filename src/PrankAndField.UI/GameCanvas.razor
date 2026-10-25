@@ -17,7 +17,8 @@
         </label>
         @if (_relayUrl is not null)
         {
-            <button class="paf-btn paf-online-btn @(Host.Online is not null ? "paf-on" : "")" type="button" @onclick="ToggleOnlinePanel">@T("online.button")</button>
+            <button class="paf-btn paf-online-btn @(Host.Online is not null ? "paf-on" : "")" type="button" @onclick="ToggleOnlinePanel"
+                    disabled="@(Host.OnlineLocked && Host.Online is null)" title="@(Host.OnlineLocked ? T("online.locked") : null)">@T("online.button")</button>
         }
         <button class="paf-btn" type="button" @onclick="ToggleMute" title="Mute">@(_muted ? "🔇" : "🔊")</button>
         <button class="paf-btn" type="button" @onclick="ToggleFullscreen" title="Fullscreen">⛶</button>
@@ -43,6 +44,10 @@
                 <h2>@T("online.title")</h2>
                 @switch (Host.Online)
                 {
+                    case null when Host.OnlineLocked:
+                        <p>@T("online.locked")</p>
+                        <button class="paf-btn" type="button" @onclick="ToggleOnlinePanel">@T("online.close")</button>
+                        break;
                     case null:
                         <p>@T("online.intro")</p>
                         <button class="paf-btn" type="button" @onclick="CreateRoom">@T("online.create")</button>
@@ -148,14 +153,14 @@
 
     private void CreateRoom()
     {
-        if (_relayUrl is null || Host.Online is not null) return;
+        if (_relayUrl is null || Host.Online is not null || Host.OnlineLocked) return;
         Host.CreateOnline(_relayUrl, _relayKey);
     }
 
     private void JoinRoom()
     {
         string code = _joinCode.Trim();
-        if (_relayUrl is null || Host.Online is not null || code.Length == 0) return;
+        if (_relayUrl is null || Host.Online is not null || Host.OnlineLocked || code.Length == 0) return;
         Host.JoinOnline(_relayUrl, code, _relayKey);
         _panelOpen = false;
     }

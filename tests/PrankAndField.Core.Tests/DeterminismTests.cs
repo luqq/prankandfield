@@ -40,14 +40,14 @@ public class DeterminismTests
     }
 
     [Fact]
-    public void OnlineGamesIgnoreTheDebugKey()
+    public void OnlineGamesIgnoreTheKonamiCode()
     {
         var local = new Game();
-        local.Tick(new InputFrame(Debug: true), InputFrame.None);
+        local.Tick(new InputFrame(Konami: true), InputFrame.None);
         Assert.Equal(GameState.PracticeMenu, local.State);
 
         var online = new Game(online: true);
-        online.Tick(new InputFrame(Debug: true), InputFrame.None);
+        online.Tick(new InputFrame(Konami: true), InputFrame.None);
         Assert.Equal(GameState.Title, online.State);
     }
 

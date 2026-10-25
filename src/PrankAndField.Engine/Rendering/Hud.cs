@@ -3,6 +3,7 @@ using PrankAndField.Core;
 using PrankAndField.Core.Events;
 using PrankAndField.Core.Localization;
 using PrankAndField.Engine.Graphics;
+using PrankAndField.Engine.Sprites;
 
 namespace PrankAndField.Engine.Rendering;
 
@@ -61,7 +62,7 @@ public static class Hud
             PixelFont.Draw(dl, 26, y, p.Name, color, 1);
             // score right-aligned, then the chances as a mustachioed face with a count (like the arcade "face x0")
             PixelFont.Draw(dl, 100, y, Points(p.Score), Palette.White, 1, TextAlign.Right);
-            DrawChanceIcon(dl, 110, y + 3.5);
+            DrawChanceIcon(dl, 110, y + 3.5, i == 0 ? AthleteColors.Player1 : AthleteColors.Player2);
             PixelFont.Draw(dl, 116, y, Math.Max(0, p.Chances).ToString(), Palette.HudPink, 1);
         }
         if (game.PlayerCount == 1)
@@ -86,10 +87,10 @@ public static class Hud
         DrawLowerRows(dl, game, time);
     }
 
-    private static void DrawChanceIcon(DrawList dl, double cx, double cy)
+    private static void DrawChanceIcon(DrawList dl, double cx, double cy, AthleteColors colors)
     {
-        dl.FillCircle(cx, cy, 2.6, Palette.Skin);
-        dl.FillRect(cx - 2.4, cy - 2.6, 4.8, 1.4, Palette.HairBrown);
+        dl.FillCircle(cx, cy, 2.6, colors.Skin);
+        dl.FillRect(cx - 2.4, cy - 2.6, 4.8, 1.4, colors.Hair);
         dl.FillRect(cx - 1.4, cy + 0.4, 2.8, 0.9, Palette.Mustache);
         dl.FillRect(cx - 1.2, cy - 0.9, 0.7, 0.7, Palette.Black);
         dl.FillRect(cx + 0.5, cy - 0.9, 0.7, 0.7, Palette.Black);

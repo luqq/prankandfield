@@ -97,7 +97,7 @@ public class RendererTests
         foreach (var culture in Localizer.SupportedCultures)
         {
             var game = new Game(new Localizer(culture));
-            game.Tick(new InputFrame(Debug: true), InputFrame.None);
+            game.Tick(new InputFrame(Konami: true), InputFrame.None);
             Assert.Equal(GameState.PracticeMenu, game.State);
             Validate(new GameRenderer().Render(game).ToArray());
         }

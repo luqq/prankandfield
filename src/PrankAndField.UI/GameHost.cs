@@ -42,11 +42,30 @@ public sealed class GameHost
     /// <summary>Current online match, from creating or joining a room until the player leaves it.</summary>
     public OnlineMatch? Online { get; private set; }
 
+    /// <summary>
+    /// True once the practice menu (Konami code) was used in the local game: online play stays off until the
+    /// page is reloaded or the game restarted.
+    /// </summary>
+    public bool OnlineLocked => _localGame.PracticeUsed;
+
     /// <summary>Opens a room on the relay at <paramref name="hubUrl"/>; the other player joins with its code.</summary>
-    public OnlineMatch CreateOnline(Uri hubUrl, string? accessKey = null) => Online = OnlineMatch.Create(hubUrl, accessKey, _localGame.Localizer);
+    public OnlineMatch CreateOnline(Uri hubUrl, string? accessKey = null)
+    {
+        EnsureOnlineAllowed();
+        return Online = OnlineMatch.Create(hubUrl, accessKey, _localGame.Localizer);
+    }
 
     /// <summary>Joins the room <paramref name="code"/> on the relay at <paramref name="hubUrl"/>.</summary>
-    public OnlineMatch JoinOnline(Uri hubUrl, string code, string? accessKey = null) => Online = OnlineMatch.Join(hubUrl, accessKey, code, _localGame.Localizer);
+    public OnlineMatch JoinOnline(Uri hubUrl, string code, string? accessKey = null)
+    {
+        EnsureOnlineAllowed();
+        return Online = OnlineMatch.Join(hubUrl, accessKey, code, _localGame.Localizer);
+    }
+
+    private void EnsureOnlineAllowed()
+    {
+        if (OnlineLocked) throw new InvalidOperationException("Online play is locked after using the practice menu.");
+    }
 
     /// <summary>Closes the online match and goes back to the local game where it was left.</summary>
     public async Task LeaveOnlineAsync()
