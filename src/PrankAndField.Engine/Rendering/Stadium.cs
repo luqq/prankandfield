@@ -1,3 +1,4 @@
+using PrankAndField.Core;
 using PrankAndField.Core.Events;
 using PrankAndField.Engine.Graphics;
 
@@ -166,7 +167,7 @@ public static class Stadium
         dl.FillRect(boardX - 2.5, runTop, 2.5, runH, Palette.Board);
         dl.FillRect(boardX, runTop, 1, runH, Palette.Plasticine);
         // sand pit from board+1m to board+11m
-        double pitL = Layout.ToScreenX(boardM + 1.0, cameraX);
+        double pitL = Layout.ToScreenX(boardM + Rules.LongJumpPitStart, cameraX);
         double pitR = Layout.ToScreenX(boardM + 11.0, cameraX);
         var pit = new[]
         {

@@ -80,13 +80,14 @@ public sealed class LongJumpSimulation : FieldEventSimulation
                     State = JumpState.Landed;
                     a.Pose = Pose.Land;
                     Cue(AudioCue.SfxLand);
-                    if (_foulJump)
+                    double mark = a.X - BoardX;
+                    // Landing short of the sand is a no-jump too, never a negative mark.
+                    if (_foulJump || mark < Rules.LongJumpPitStart)
                     {
                         CompleteAttempt(Attempt.Fouled);
                     }
                     else
                     {
-                        double mark = a.X - BoardX;
                         CompleteAttempt(Attempt.Of(mark));
                     }
                 }

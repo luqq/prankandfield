@@ -65,6 +65,7 @@ public static class Rules
     // --- Long jump -------------------------------------------------------------------------
     public const double LongJumpBoard = 40.0;          // metres from start to the take-off board
     public const double LongJumpFoulTolerance = 0.0;   // foot past the board = foul
+    public const double LongJumpPitStart = 1.0;        // metres past the board where the sand begins; landing short of it = foul
     public const double LongJumpOvershoot = 0.6;       // running this far past the board without jumping = foul
     public const double LongJumpBoardBonusZone = 0.3;  // metres before the board that give a speed bonus
     public const double LongJumpBoardBonus = 50;       // cm/s
