@@ -19,6 +19,7 @@
     <ProjectReference Include="..\PrankAndField.Core\PrankAndField.Core.csproj" />
     <ProjectReference Include="..\PrankAndField.Engine\PrankAndField.Engine.csproj" />
     <ProjectReference Include="..\PrankAndField.Audio\PrankAndField.Audio.csproj" />
+    <ProjectReference Include="..\PrankAndField.Net.Client\PrankAndField.Net.Client.csproj" />
   </ItemGroup>
 
 </Project>

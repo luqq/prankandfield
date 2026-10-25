@@ -151,6 +151,10 @@ export function setMuted(muted) {
   if (state.audio) state.audio.setMuted(muted);
 }
 
+export function focusCanvas() {
+  state.canvas?.focus();
+}
+
 export function toggleFullscreen(rootId) {
   const el = document.getElementById(rootId);
   if (!el) return;
