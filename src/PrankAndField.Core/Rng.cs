@@ -10,6 +10,9 @@ public sealed class Rng
         _state = seed == 0 ? 0x9E3779B9u : seed;
     }
 
+    /// <summary>Internal state, exposed so peers of an online match can compare their simulations.</summary>
+    public uint State => _state;
+
     public uint NextUInt()
     {
         uint x = _state;

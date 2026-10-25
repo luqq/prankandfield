@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PrankAndField.Net.Client</RootNamespace>
+    <Description>SignalR client of the Prank &amp; Field relay: creates or joins a room and exposes the match as an IGameTransport. Runs in Blazor WebAssembly and on desktop.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PrankAndField.Net\PrankAndField.Net.csproj" />
+  </ItemGroup>
+</Project>

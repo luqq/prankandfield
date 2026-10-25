@@ -16,12 +16,15 @@ projects; the same Razor component runs in a browser (Blazor WebAssembly) and in
 | `src/PrankAndField.Core` | Game logic only: events, running/ballistics model, rules and qualifying table, scoring, world records (JSON persistence), the credit state machine and the localizer. No rendering, no audio playback. |
 | `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]`, a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache), stadium, HUD and all screens. Backend-agnostic. |
 | `src/PrankAndField.Audio` | Songs (notes + syllables), sound ids, voice lines and the cue mapping. Serialized to the JavaScript synthesizer. |
+| `src/PrankAndField.Net` | Online play: deterministic lockstep session (input delay, checksum exchange), wire messages and the transport abstraction, plus an in-memory link for local play and tests. Not wired into the UI yet. |
+| `src/PrankAndField.Net.Client` | SignalR client of the relay: creates or joins a room and exposes the match as an `IGameTransport`. |
+| `src/PrankAndField.Server` | Relay server (ASP.NET Core + SignalR): private rooms by code, forwards inputs and checksums. Docker image for amd64/arm64; see its README. |
 | `src/PrankAndField.UI` | Shared Razor Class Library: the `GameCanvas` component, `GameHost` (composes the three layers) and `prankandfield.js` (canvas backend, Web Audio synth with formant "robot singing", speech announcer, keyboard/gamepad/touch input, persistence). |
 | `src/PrankAndField.Web` | Blazor WebAssembly host (uses `[JSExport]` for a JSON-free frame bridge). |
 | `src/PrankAndField.Desktop` | Desktop host (PhotinoX.Blazor, Blazor Hybrid). |
-| `tests/*` | xUnit suites for Core (physics, every event, full-game runs with a scripted bot, localization completeness), Engine (draw list encoding, font coverage, every screen of a whole game in every language) and Audio (songs, cue map, catalog JSON, host frame). |
+| `tests/*` | xUnit suites for Core (physics, every event, full-game runs with a scripted bot, localization completeness), Engine (draw list encoding, font coverage, every screen of a whole game in every language), Audio (songs, cue map, catalog JSON, host frame), Net (two bots playing a credit over a laggy link, input delay, stalls, desync detection) and Server (rooms, CORS, two peers in lockstep through the real hub). |
 
-Dependency direction: `Core ← Engine`, `Core ← Audio`, `Core/Engine/Audio ← UI ← Web/Desktop`. Core never references the others.
+Dependency direction: `Core ← Engine`, `Core ← Audio`, `Core ← Net ← Net.Client`, `Server` (standalone), `Core/Engine/Audio ← UI ← Web/Desktop`. Core never references the others.
 
 ## Running
 
@@ -49,6 +52,23 @@ dotnet test PrankAndField.slnx
 every push to `main` (or manually from the Actions tab). Enable it once in the repository settings:
 *Settings → Pages → Build and deployment → Source: GitHub Actions*. The workflow rewrites `<base href>` to the
 repository path, adds `.nojekyll` so the `_framework` folder is served, and copies `index.html` to `404.html`.
+
+## Online play (branch `main-online`)
+
+The **ONLINE** button in the toolbar opens a room on the relay server (`src/PrankAndField.Server`) and shows a
+five-letter code and an invite link (`?sala=CODE`); the other player types the code or opens the link. Each
+browser is one player (both local control sets move your athlete) and both run the same simulation in lockstep.
+Online matches use their own record board and never touch the local one.
+
+The button only appears when the web host knows the relay: set `RelayUrl` in
+`src/PrankAndField.Web/wwwroot/appsettings.json` (for example `https://paf.example.com/hub`), or add
+`?relay=<hub url>` to the page URL. To try it locally:
+
+```bash
+dotnet run --project src/PrankAndField.Server --urls http://localhost:5000
+dotnet run --project src/PrankAndField.Web
+# open http://localhost:5173/?relay=http://localhost:5000/hub in two browsers
+```
 
 ## Controls
 

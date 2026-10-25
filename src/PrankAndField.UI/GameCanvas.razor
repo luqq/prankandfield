@@ -1,6 +1,7 @@
 @using PrankAndField.Core.Localization
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <div class="paf-root" id="@_rootId">
     <div class="paf-toolbar">
@@ -14,17 +15,76 @@
                 }
             </select>
         </label>
+        @if (_relayUrl is not null)
+        {
+            <button class="paf-btn paf-online-btn @(Host.Online is not null ? "paf-on" : "")" type="button" @onclick="ToggleOnlinePanel">@T("online.button")</button>
+        }
         <button class="paf-btn" type="button" @onclick="ToggleMute" title="Mute">@(_muted ? "🔇" : "🔊")</button>
         <button class="paf-btn" type="button" @onclick="ToggleFullscreen" title="Fullscreen">⛶</button>
+        <span class="paf-credit" title="@T("credit.by", "Hiryu Soft")">
+            <svg class="paf-credit-logo" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <circle cx="12" cy="12" r="11" fill="#e03838" />
+                <path d="M4 16.5c3.2-.6 5.6-3.4 6.6-9.5 1 3.4 3.4 5.4 8.4 5-2.6 1.1-4.4 3.3-5.2 6.6-2.4-2-5.8-2.4-9.8-2.1z" fill="#f8e858" />
+                <path d="M10.6 7c1.6-1.8 3.6-2.6 6-2.4-1.2.6-2 1.4-2.4 2.6" fill="none" stroke="#f8e858" stroke-width="1.2" stroke-linecap="round" />
+                <circle cx="15.2" cy="11.4" r="1" fill="#e03838" />
+            </svg>
+            <span class="paf-credit-text">@T("credit.by", "Hiryu Soft")</span>
+        </span>
     </div>
     <div class="paf-stage">
         <canvas id="@_canvasId" class="paf-canvas" tabindex="0"></canvas>
+        @if (Host.Online is { } match && !_panelOpen && !match.IsOver && match.Status == OnlineStatus.Playing)
+        {
+            <div class="paf-online-badge">@T("online.playing", match.PlayerNumber ?? 1)@(match.IsLagging ? " - " + T("online.lag") : "")</div>
+        }
+        @if (_panelOpen || Host.Online is { IsOver: true })
+        {
+            <div class="paf-online-panel" role="dialog" aria-label="@T("online.title")">
+                <h2>@T("online.title")</h2>
+                @switch (Host.Online)
+                {
+                    case null:
+                        <p>@T("online.intro")</p>
+                        <button class="paf-btn" type="button" @onclick="CreateRoom">@T("online.create")</button>
+                        <div class="paf-online-join">
+                            <input class="paf-online-code" maxlength="5" placeholder="@T("online.code")" @bind="_joinCode" @bind:event="oninput" @onkeydown="OnCodeKey" />
+                            <button class="paf-btn" type="button" disabled="@(_joinCode.Trim().Length == 0)" @onclick="JoinRoom">@T("online.join")</button>
+                        </div>
+                        <button class="paf-btn paf-online-secondary" type="button" @onclick="ToggleOnlinePanel">@T("online.close")</button>
+                        break;
+                    case { Status: OnlineStatus.Connecting }:
+                        <p>@T("online.connecting")</p>
+                        <button class="paf-btn" type="button" @onclick="LeaveOnline">@T("online.leave")</button>
+                        break;
+                    case { Status: OnlineStatus.WaitingForOpponent } waiting:
+                        <p>@T("online.waiting", waiting.Code ?? "")</p>
+                        <p class="paf-online-big">@waiting.Code</p>
+                        <p>@T("online.share")</p>
+                        <div class="paf-online-join">
+                            <input class="paf-online-link" readonly value="@InviteLink(waiting.Code)" />
+                            <button class="paf-btn" type="button" @onclick="() => CopyInvite(waiting.Code)">@T("online.copy")</button>
+                        </div>
+                        <button class="paf-btn" type="button" @onclick="LeaveOnline">@T("online.leave")</button>
+                        break;
+                    case { Status: OnlineStatus.Playing } playing:
+                        <p>@T("online.playing", playing.PlayerNumber ?? 1)</p>
+                        <p>@T("online.controls")</p>
+                        <button class="paf-btn" type="button" @onclick="ToggleOnlinePanel">@T("online.close")</button>
+                        <button class="paf-btn paf-online-secondary" type="button" @onclick="LeaveOnline">@T("online.leave")</button>
+                        break;
+                    case { } over:
+                        <p>@OverMessage(over)</p>
+                        <button class="paf-btn" type="button" @onclick="LeaveOnline">@T("online.close")</button>
+                        break;
+                }
+            </div>
+        }
     </div>
     <div class="paf-touch" aria-hidden="true">
-        <button class="paf-touch-btn" data-paf-key="run1">RUN</button>
-        <button class="paf-touch-btn paf-touch-action" data-paf-key="action">JUMP / THROW</button>
-        <button class="paf-touch-btn" data-paf-key="run2">RUN</button>
-        <button class="paf-touch-btn paf-touch-start" data-paf-key="start">START</button>
+        <button class="paf-touch-btn" data-paf-key="run1">@T("touch.run")</button>
+        <button class="paf-touch-btn paf-touch-action" data-paf-key="action">@T("touch.action")</button>
+        <button class="paf-touch-btn" data-paf-key="run2">@T("touch.run")</button>
+        <button class="paf-touch-btn paf-touch-start" data-paf-key="start">@T("touch.start")</button>
     </div>
 </div>
 
@@ -35,16 +95,144 @@
     private string _language = Localizer.DefaultCulture;
     private bool _muted;
 
+    private Uri? _relayUrl;
+    private string? _relayKey;
+    private bool _panelOpen;
+    private string _joinCode = "";
+    private string? _autoJoinCode;
+    private Timer? _onlineTimer;
+
     /// <summary>Initial language (BCP-47). Overrides the stored preference when set.</summary>
     [Parameter] public string? Language { get; set; }
+
+    /// <summary>
+    /// SignalR hub of the online relay, e.g. <c>https://paf.example.com/hub</c>. Without it the ONLINE button is
+    /// hidden. A <c>?relay=</c> query parameter overrides it (handy to test against a local server).
+    /// </summary>
+    [Parameter] public string? RelayUrl { get; set; }
+
+    /// <summary>Access key of the relay (its <c>Relay:AccessKey</c>), injected at build time; empty when it has none.</summary>
+    [Parameter] public string? RelayKey { get; set; }
+
+    private static GameHost Host => GameHost.Instance;
+
+    private static string T(string key) => Host.Game.Localizer.Get(key);
+
+    private static string T(string key, object arg) => Host.Game.Localizer.Format(key, arg);
+
+    protected override void OnInitialized()
+    {
+        var query = ParseQuery(new Uri(Navigation.Uri).Query);
+        string? relay = query.GetValueOrDefault("relay") ?? RelayUrl;
+        if (!string.IsNullOrWhiteSpace(relay) && Uri.TryCreate(relay, UriKind.Absolute, out var uri)) _relayUrl = uri;
+        // The built-in key only goes to the built-in relay; another ?relay= may take its own ?relaykey=.
+        _relayKey = query.ContainsKey("relay") ? query.GetValueOrDefault("relaykey") : RelayKey;
+        // An invite link (?sala=CODE) joins the room as soon as the game is running.
+        _autoJoinCode = query.GetValueOrDefault("sala") ?? query.GetValueOrDefault("room");
+        _onlineTimer = new Timer(_ => InvokeAsync(StateHasChanged), null, 250, 250);
+    }
+
+    private static Dictionary<string, string> ParseQuery(string query)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int eq = part.IndexOf('=');
+            if (eq <= 0) continue;
+            result[Uri.UnescapeDataString(part[..eq])] = Uri.UnescapeDataString(part[(eq + 1)..].Replace('+', ' '));
+        }
+        return result;
+    }
+
+    private void ToggleOnlinePanel() => _panelOpen = !_panelOpen;
+
+    private void CreateRoom()
+    {
+        if (_relayUrl is null || Host.Online is not null) return;
+        Host.CreateOnline(_relayUrl, _relayKey);
+    }
+
+    private void JoinRoom()
+    {
+        string code = _joinCode.Trim();
+        if (_relayUrl is null || Host.Online is not null || code.Length == 0) return;
+        Host.JoinOnline(_relayUrl, code, _relayKey);
+        _panelOpen = false;
+    }
+
+    private void OnCodeKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") JoinRoom();
+    }
+
+    private async Task LeaveOnline()
+    {
+        await Host.LeaveOnlineAsync();
+        _panelOpen = false;
+        await FocusCanvas();
+    }
+
+    private string InviteLink(string? code) => Navigation.BaseUri + "?sala=" + Uri.EscapeDataString(code ?? "");
+
+    private async Task CopyInvite(string? code)
+    {
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", InviteLink(code)); }
+        catch (JSException) { /* the link stays selectable in the box */ }
+    }
+
+    private static string OverMessage(OnlineMatch match) => match.Status switch
+    {
+        OnlineStatus.OpponentLeft => T("online.opponent_left"),
+        OnlineStatus.Desynced => T("online.desync"),
+        OnlineStatus.Failed => T("online.failed", match.Error ?? ""),
+        _ => T("online.finished"),
+    };
+
+    private async Task FocusCanvas()
+    {
+        if (_module is null) return;
+        try { await _module.InvokeVoidAsync("focusCanvas"); }
+        catch (JSException) { /* focus is a nicety: never break the UI for it */ }
+    }
+
+    /// <summary>
+    /// The module URL carries the build id so a new deploy never runs against a stale cached script.
+    /// </summary>
+    private static readonly string ModuleUrl = "./_content/PrankAndField.UI/prankandfield.js?v="
+        + typeof(GameCanvas).Assembly.ManifestModule.ModuleVersionId.ToString("N")[..12];
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Close the panel by itself once the opponent is in, so the keys reach the game.
+        if (_panelOpen && Host.Online is { Status: OnlineStatus.Playing } && _closeWhenPlaying)
+        {
+            _closeWhenPlaying = false;
+            _panelOpen = false;
+            _ = FocusCanvas();
+            StateHasChanged();
+        }
+        else if (Host.Online is { Status: OnlineStatus.WaitingForOpponent or OnlineStatus.Connecting })
+        {
+            _closeWhenPlaying = true;
+        }
+    }
+
+    private bool _closeWhenPlaying;
 
     private static string LanguageName(string culture) => Localizer.Load(culture).TryGetValue("lang.name", out var n) ? n : culture;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/PrankAndField.UI/prankandfield.js");
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", ModuleUrl);
         _language = await _module.InvokeAsync<string>("start", _canvasId, _rootId, Language);
+        if (_autoJoinCode is { Length: > 0 } code && _relayUrl is not null && Host.Online is null)
+        {
+            _joinCode = code;
+            JoinRoom();
+            // Drop ?sala= so a reload does not try to join the same (closed) room again.
+            Navigation.NavigateTo(Navigation.BaseUri, replace: true);
+        }
         StateHasChanged();
     }
 
@@ -67,6 +255,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _onlineTimer?.Dispose();
         if (_module is not null)
         {
             try { await _module.InvokeVoidAsync("stop"); } catch (JSDisconnectedException) { }

@@ -47,14 +47,21 @@ public sealed class Game
     private double _accumulator;
     private readonly uint _seed;
 
-    public Game(Localizer? localizer = null, WorldRecords? records = null, uint seed = 12345)
+    public Game(Localizer? localizer = null, WorldRecords? records = null, uint seed = 12345, bool online = false)
     {
+        IsOnline = online;
         Localizer = localizer ?? new Localizer();
         Records = records ?? new WorldRecords();
         _seed = seed;
         Rng = new Rng(seed);
         EnterTitle();
     }
+
+    /// <summary>
+    /// Online match: both peers run this simulation in lockstep, so the debug key (practice menu,
+    /// which reseeds and changes the player count) is ignored.
+    /// </summary>
+    public bool IsOnline { get; }
 
     public Localizer Localizer { get; }
     public WorldRecords Records { get; }
@@ -90,6 +97,17 @@ public sealed class Game
     public char[] EntryLetters { get; } = ['A', 'A', 'A'];
     public int EntryCursor { get; private set; }
     public int EntryRecordRank { get; private set; }
+
+    /// <summary>
+    /// Online name entry: each seat types its own name at the same time with its own controls, and the
+    /// credit starts once both confirmed. Offline the players still take turns through <see cref="EntryLetters"/>.
+    /// </summary>
+    public bool SimultaneousNameEntry { get; private set; }
+
+    /// <summary>Per-seat name being typed while <see cref="SimultaneousNameEntry"/> is on.</summary>
+    public IReadOnlyList<NameSlot> NameSlots => _nameSlots;
+
+    private readonly NameSlot[] _nameSlots = [new(), new()];
     public double EntryMark { get; private set; }
 
     /// <summary>Set when the record board changed; the host saves it and calls <see cref="MarkRecordsSaved"/>.</summary>
@@ -127,7 +145,9 @@ public sealed class Game
         switch (State)
         {
             case GameState.Title: TickTitle(); break;
-            case GameState.NameEntry: TickTextEntry(isRecord: false); break;
+            case GameState.NameEntry:
+                if (SimultaneousNameEntry) TickSimultaneousNameEntry(); else TickTextEntry(isRecord: false);
+                break;
             case GameState.EventIntro: if (StateTime >= 3.2 || AnyStart()) StartEvent(); break;
             case GameState.Event: TickEvent(); break;
             case GameState.EventOutcome: if (StateTime >= 3.6 || (StateTime > 0.8 && AnyStart())) AfterOutcome(); break;
@@ -177,7 +197,7 @@ public sealed class Game
     {
         var e0 = _edges[0];
         var e1 = _edges[1];
-        if (e0.DebugPressed)
+        if (e0.DebugPressed && !IsOnline)
         {
             SetState(GameState.PracticeMenu);
             Cue(AudioCue.SfxMenuSelect);
@@ -197,6 +217,18 @@ public sealed class Game
         }
     }
 
+    /// <summary>
+    /// Online match: skips the title menu and starts a two-player credit at name entry. Both peers call it
+    /// on the same tick so their simulations stay in lockstep.
+    /// </summary>
+    public void StartOnlineCredit()
+    {
+        if (!IsOnline) throw new InvalidOperationException("Only online games skip the title.");
+        MenuSelection = 1;
+        PlayerCount = 2;
+        BeginGame();
+    }
+
     private void BeginGame()
     {
         Rng = new Rng(_seed + (uint)(TotalTime * 1000));
@@ -209,6 +241,8 @@ public sealed class Game
         }
         EntryPlayer = 0;
         StartTextEntry(Players[0].Name);
+        SimultaneousNameEntry = IsOnline && PlayerCount == 2;
+        for (int i = 0; i < _nameSlots.Length; i++) _nameSlots[i].Reset(Players[i].Name);
         SetState(GameState.NameEntry);
         Cue(AudioCue.SongNameEntry);
     }
@@ -273,6 +307,41 @@ public sealed class Game
                 EnterEventIntro(EventKind.Dash100m);
             }
         }
+    }
+
+    private void TickSimultaneousNameEntry()
+    {
+        for (int seat = 0; seat < 2; seat++)
+        {
+            var slot = _nameSlots[seat];
+            if (slot.Done) continue;
+            // Only this seat's own controls: online each browser drives one seat.
+            var e = _edges[seat];
+            int idx = Alphabet.IndexOf(slot.Letters[slot.Cursor]);
+            if (e.Run2Pressed || e.RightPressed || e.UpPressed)
+            {
+                slot.Letters[slot.Cursor] = Alphabet[(idx + 1) % Alphabet.Length];
+                Cue(AudioCue.SfxMenuMove);
+            }
+            else if (e.Run1Pressed || e.LeftPressed || e.DownPressed)
+            {
+                slot.Letters[slot.Cursor] = Alphabet[(idx - 1 + Alphabet.Length) % Alphabet.Length];
+                Cue(AudioCue.SfxMenuMove);
+            }
+            bool accept = e.StartPressed;
+            // Online both key sets drive the seat, and ArrowUp is "up" for one and "jump" for the other:
+            // a press that brings both only changes the letter.
+            if (e.ActionPressed && !e.UpPressed)
+            {
+                Cue(AudioCue.SfxMenuSelect);
+                if (slot.Cursor < 2) slot.Cursor++; else accept = true;
+            }
+            if (!accept) continue;
+            slot.Done = true;
+            Players[seat].Name = slot.Text;
+            Cue(AudioCue.SfxMenuSelect);
+        }
+        if (_nameSlots[0].Done && _nameSlots[1].Done) EnterEventIntro(EventKind.Dash100m);
     }
 
     // ------------------------------------------------------------------ events
@@ -441,5 +510,76 @@ public sealed class Game
         }
         Round = Math.Max(1, round);
         EnterEventIntro(kind);
+    }
+
+    /// <summary>
+    /// Hash of the state that decides the outcome of a credit. Two peers that ran the same ticks with the
+    /// same seed and inputs get the same value; a mismatch means their simulations diverged.
+    /// </summary>
+    public ulong Checksum()
+    {
+        var h = new StateHash();
+        h.Add((int)State);
+        h.Add(StateTime);
+        h.Add(Rng.State);
+        h.Add(Round);
+        h.Add((int)CurrentEvent);
+        h.Add(PlayerCount);
+        h.Add(MenuSelection);
+        h.Add(EntryPlayer);
+        h.Add(EntryCursor);
+        foreach (char c in EntryLetters) h.Add(c);
+        h.Add(SimultaneousNameEntry);
+        foreach (var slot in _nameSlots)
+        {
+            h.Add(slot.Cursor);
+            h.Add(slot.Done);
+            foreach (char c in slot.Letters) h.Add(c);
+        }
+        foreach (var p in Players)
+        {
+            h.Add(p.Score);
+            h.Add(p.Chances);
+            h.Add(p.IsOut);
+            h.Add(p.CurrentMark ?? -1);
+            foreach (char c in p.Name) h.Add(c);
+        }
+        if (Simulation is { } sim)
+        {
+            h.Add(sim.Elapsed);
+            h.Add(sim.IsFinished);
+            h.Add(sim.BonusPoints[0]);
+            h.Add(sim.BonusPoints[1]);
+            foreach (var a in sim.Athletes)
+            {
+                h.Add(a.X);
+                h.Add(a.Y);
+                h.Add(a.Runner.SpeedCm);
+                h.Add((int)a.Pose);
+            }
+        }
+        return h.Value;
+    }
+
+    /// <summary>FNV-1a over the raw bits of each value.</summary>
+    private struct StateHash
+    {
+        public ulong Value = 14695981039346656037UL;
+
+        public StateHash() { }
+
+        public void Add(long v)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                Value ^= (byte)(v >> (8 * i));
+                Value *= 1099511628211UL;
+            }
+        }
+
+        public void Add(int v) => Add((long)v);
+        public void Add(uint v) => Add((long)v);
+        public void Add(bool v) => Add(v ? 1L : 0L);
+        public void Add(double v) => Add(BitConverter.DoubleToInt64Bits(v));
     }
 }

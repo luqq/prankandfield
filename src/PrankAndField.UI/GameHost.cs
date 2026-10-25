@@ -29,25 +29,47 @@ public sealed class GameHost
         }
     }
 
+    private Game _localGame;
+
     public GameHost()
     {
-        Game = new Game(new Localizer(), new WorldRecords(), (uint)Environment.TickCount);
+        _localGame = new Game(new Localizer(), new WorldRecords(), (uint)Environment.TickCount);
     }
 
-    public Game Game { get; private set; }
+    /// <summary>The game on screen: the online match once it started, otherwise the local one.</summary>
+    public Game Game => Online?.Session?.Game ?? _localGame;
+
+    /// <summary>Current online match, from creating or joining a room until the player leaves it.</summary>
+    public OnlineMatch? Online { get; private set; }
+
+    /// <summary>Opens a room on the relay at <paramref name="hubUrl"/>; the other player joins with its code.</summary>
+    public OnlineMatch CreateOnline(Uri hubUrl, string? accessKey = null) => Online = OnlineMatch.Create(hubUrl, accessKey, _localGame.Localizer);
+
+    /// <summary>Joins the room <paramref name="code"/> on the relay at <paramref name="hubUrl"/>.</summary>
+    public OnlineMatch JoinOnline(Uri hubUrl, string code, string? accessKey = null) => Online = OnlineMatch.Join(hubUrl, accessKey, code, _localGame.Localizer);
+
+    /// <summary>Closes the online match and goes back to the local game where it was left.</summary>
+    public async Task LeaveOnlineAsync()
+    {
+        if (Online is not { } match) return;
+        Online = null;
+        await match.DisposeAsync();
+    }
 
     /// <summary>Restores persisted records and language. Safe to call before the first frame.</summary>
     public void Initialize(string? recordsJson, string? language)
     {
-        if (!string.IsNullOrWhiteSpace(recordsJson)) Game.Records.TryLoadJson(recordsJson);
-        if (!string.IsNullOrWhiteSpace(language)) Game.SetLanguage(language);
+        if (!string.IsNullOrWhiteSpace(recordsJson)) _localGame.Records.TryLoadJson(recordsJson);
+        if (!string.IsNullOrWhiteSpace(language)) _localGame.SetLanguage(language);
     }
 
-    public void SetLanguage(string language) => Game.SetLanguage(language);
+    // The online game shares the local game's localizer.
+    public void SetLanguage(string language) => _localGame.SetLanguage(language);
 
     public string Language => Game.Localizer.Culture;
 
-    public string RecordsJson => Game.Records.ToJson();
+    /// <summary>The local record board; online matches play on a fresh board that is never persisted.</summary>
+    public string RecordsJson => _localGame.Records.ToJson();
 
     public string AudioCatalogJson => AudioCatalog.ToJson();
 
@@ -55,18 +77,38 @@ public sealed class GameHost
 
     /// <summary>
     /// Advances the game by <paramref name="dtSeconds"/> with the given input masks, renders a frame and
-    /// returns the encoded draw list followed by pending audio events. When the record board changed,
-    /// an audio-section marker event (kind 9) tells the host to persist <see cref="RecordsJson"/>.
+    /// returns the encoded draw list followed by pending audio events (see <see cref="Present"/>).
+    /// During an online match both masks drive this browser's seat; the local game stays paused.
     /// </summary>
     public double[] Frame(double dtSeconds, int p1Mask, int p2Mask)
     {
-        Game.Advance(dtSeconds, InputFrame.FromMask(p1Mask), InputFrame.FromMask(p2Mask));
+        if (Online is { Session: not null } match) match.Advance(dtSeconds, p1Mask | p2Mask);
+        else _localGame.Advance(dtSeconds, InputFrame.FromMask(p1Mask), InputFrame.FromMask(p2Mask));
+        return Present();
+    }
+
+    /// <summary>
+    /// Runs exactly one fixed tick with the given input masks, without rendering. An online session calls
+    /// this once per tick whose inputs both peers have confirmed, then <see cref="Present"/> once per frame.
+    /// </summary>
+    public void Step(int p1Mask, int p2Mask) => Game.Tick(InputFrame.FromMask(p1Mask), InputFrame.FromMask(p2Mask));
+
+    /// <summary>
+    /// Renders the current state and returns the encoded draw list followed by pending audio events.
+    /// When the record board changed, an audio-section marker event (kind 9) tells the host to persist
+    /// <see cref="RecordsJson"/>.
+    /// </summary>
+    public double[] Present()
+    {
         _sequencer.Drain(Game);
+        _renderer.LocalSeat = Online?.Session?.LocalSeat;
         var dl = _renderer.Render(Game);
         var events = _sequencer.Take();
-        if (Game.RecordsDirty)
+        // Only the local board is persisted; an online match's board is discarded with it.
+        bool saveRecords = Game.RecordsDirty && ReferenceEquals(Game, _localGame);
+        if (Game.RecordsDirty) Game.MarkRecordsSaved();
+        if (saveRecords)
         {
-            Game.MarkRecordsSaved();
             var withSave = new (double, double, double)[events.Length + 1];
             events.CopyTo(withSave, 0);
             withSave[^1] = (9, 0, 0);
@@ -76,8 +118,8 @@ public sealed class GameHost
         return dl.ToArray();
     }
 
-    /// <summary>Test hook: replaces the game (e.g. to inject a seeded one).</summary>
-    public void Reset(Game game) => Game = game;
+    /// <summary>Test hook: replaces the local game (e.g. to inject a seeded one).</summary>
+    public void Reset(Game game) => _localGame = game;
 
     /// <summary>Compact JSON snapshot of the simulation, for debugging and automated play-testing from JavaScript.</summary>
     public string DebugStateJson()
