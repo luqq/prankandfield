@@ -15,7 +15,7 @@ public class RelayTests(WebApplicationFactory<Program> factory) : IClassFixture<
     private async Task<RelayClient> ConnectAsync()
     {
         var server = factory.Server;
-        var client = new RelayClient(new Uri(server.BaseAddress, MatchHub.Path), options =>
+        var client = new RelayClient(new Uri(server.BaseAddress, MatchHub.Path), configure: options =>
         {
             options.Transports = HttpTransportType.WebSockets;
             options.SkipNegotiation = true;

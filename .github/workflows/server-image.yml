@@ -1,14 +1,15 @@
 name: Build the relay server image
 
 # Builds src/PrankAndField.Server for linux/amd64 and linux/arm64 (Ampere VMs) and pushes it to
-# ghcr.io/<owner>/prankandfield-server on every push to main-online that touches the server.
-# Tags: main-online (latest build of the branch) and the commit sha.
+# ghcr.io/<owner>/prankandfield-server on every push to main or main-online that touches the server.
+# Tags: the branch name (main, main-online) and the commit sha.
 
 on:
   push:
-    branches: [main-online]
+    branches: [main, main-online]
     paths:
       - src/PrankAndField.Server/**
+      - src/PrankAndField.Net/**
       - global.json
       - Directory.Build.props
       - .github/workflows/server-image.yml
@@ -51,5 +52,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ steps.name.outputs.image }}:main-online
+            ${{ steps.name.outputs.image }}:${{ github.ref_name }}
             ${{ steps.name.outputs.image }}:${{ github.sha }}

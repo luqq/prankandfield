@@ -329,7 +329,9 @@ public sealed class Game
                 Cue(AudioCue.SfxMenuMove);
             }
             bool accept = e.StartPressed;
-            if (e.ActionPressed)
+            // Online both key sets drive the seat, and ArrowUp is "up" for one and "jump" for the other:
+            // a press that brings both only changes the letter.
+            if (e.ActionPressed && !e.UpPressed)
             {
                 Cue(AudioCue.SfxMenuSelect);
                 if (slot.Cursor < 2) slot.Cursor++; else accept = true;

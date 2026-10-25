@@ -135,6 +135,26 @@ public class LockstepSessionTests
     }
 
     [Fact]
+    public void ATapOnAFrameWithoutATickIsNotLost()
+    {
+        var link = new InMemoryLink();
+        var (p1, p2) = Match(link, delay: 2);
+        var action = new InputFrame(Action: true).ToMask();
+
+        // A short frame runs no tick: the tap must wait for the next sampled tick instead of vanishing.
+        p1.Advance(Game.TickSeconds / 4, action);
+        for (int frame = 0; frame < 6; frame++)
+        {
+            p1.Advance(Game.TickSeconds, 0);
+            p2.Advance(Game.TickSeconds, 0);
+            link.Pump();
+        }
+
+        Assert.Equal(1, p1.Game.NameSlots[0].Cursor);
+        Assert.Equal(p1.Game.Checksum(), p2.Game.Checksum());
+    }
+
+    [Fact]
     public void TheSessionNeedsAnOnlineGame()
     {
         var link = new InMemoryLink();

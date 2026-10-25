@@ -96,6 +96,7 @@
     private bool _muted;
 
     private Uri? _relayUrl;
+    private string? _relayKey;
     private bool _panelOpen;
     private string _joinCode = "";
     private string? _autoJoinCode;
@@ -110,6 +111,9 @@
     /// </summary>
     [Parameter] public string? RelayUrl { get; set; }
 
+    /// <summary>Access key of the relay (its <c>Relay:AccessKey</c>), injected at build time; empty when it has none.</summary>
+    [Parameter] public string? RelayKey { get; set; }
+
     private static GameHost Host => GameHost.Instance;
 
     private static string T(string key) => Host.Game.Localizer.Get(key);
@@ -121,6 +125,8 @@
         var query = ParseQuery(new Uri(Navigation.Uri).Query);
         string? relay = query.GetValueOrDefault("relay") ?? RelayUrl;
         if (!string.IsNullOrWhiteSpace(relay) && Uri.TryCreate(relay, UriKind.Absolute, out var uri)) _relayUrl = uri;
+        // The built-in key only goes to the built-in relay; another ?relay= may take its own ?relaykey=.
+        _relayKey = query.ContainsKey("relay") ? query.GetValueOrDefault("relaykey") : RelayKey;
         // An invite link (?sala=CODE) joins the room as soon as the game is running.
         _autoJoinCode = query.GetValueOrDefault("sala") ?? query.GetValueOrDefault("room");
         _onlineTimer = new Timer(_ => InvokeAsync(StateHasChanged), null, 250, 250);
@@ -143,14 +149,14 @@
     private void CreateRoom()
     {
         if (_relayUrl is null || Host.Online is not null) return;
-        Host.CreateOnline(_relayUrl);
+        Host.CreateOnline(_relayUrl, _relayKey);
     }
 
     private void JoinRoom()
     {
         string code = _joinCode.Trim();
         if (_relayUrl is null || Host.Online is not null || code.Length == 0) return;
-        Host.JoinOnline(_relayUrl, code);
+        Host.JoinOnline(_relayUrl, code, _relayKey);
         _panelOpen = false;
     }
 

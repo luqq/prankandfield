@@ -90,6 +90,11 @@ public class DeterminismTests
         Press(InputFrame.None, new InputFrame(Up: true));
         Assert.Equal("?AA", game.NameSlots[1].Text);
 
+        // ArrowUp sends up and jump together online: it only changes the letter.
+        Press(new InputFrame(Up: true, Action: true), InputFrame.None);
+        Assert.Equal("CAA", game.NameSlots[0].Text);
+        Assert.Equal(0, game.NameSlots[0].Cursor);
+        Press(new InputFrame(Down: true), InputFrame.None);
         Press(new InputFrame(Action: true), InputFrame.None);
         Press(new InputFrame(Up: true), InputFrame.None);
         Press(new InputFrame(Start: true), InputFrame.None);
