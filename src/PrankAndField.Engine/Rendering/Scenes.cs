@@ -9,6 +9,10 @@ public static class Scenes
 {
     private static readonly Athlete DemoP1 = new(0, false, "AAA");
     private static readonly Athlete DemoP2 = new(1, true, "CPU");
+    private static readonly Athlete DemoP2Human = new(1, false, "AAA");
+
+    /// <summary>Text colour of each player, matching the shorts of their athlete.</summary>
+    private static Rgba PlayerColor(int seat) => seat == 0 ? Rgba.Hex(0x6888F8) : Palette.HudRed;
 
     public static void DrawTitle(DrawList dl, Game game, double time)
     {
@@ -77,7 +81,7 @@ public static class Scenes
         dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
         dl.FillRect(0, Layout.FieldTop + 20, Screen.Width, 60, Palette.Black.WithAlpha(230));
         string heading = record ? loc["record.enter"] : loc.Format("name.enter", game.EntryPlayer + 1);
-        PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 26, heading, Palette.HudCyan, 0.9, TextAlign.Center);
+        PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 26, heading, record ? Palette.HudCyan : PlayerColor(game.EntryPlayer), 0.9, TextAlign.Center);
         if (record)
         {
             PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 36, loc.Format("record.rank", game.EntryRecordRank), Palette.HudYellow, 0.9, TextAlign.Center);
@@ -97,9 +101,52 @@ public static class Scenes
             }
         }
         PixelFont.Draw(dl, Screen.Width / 2, Screen.Height - 14, loc["name.hint"], Palette.HudGreen, 0.6, TextAlign.Center);
-        var a = record ? DemoP1 : DemoP1;
+        var a = game.EntryPlayer == 1 ? DemoP2Human : DemoP1;
         a.Pose = Pose.Celebrate;
         AthleteSprite.Draw(dl, 30, Layout.FieldBottom - 4, a, time);
+    }
+
+    /// <summary>
+    /// Online name entry: one column per seat, each in its player's colour, typed at the same time.
+    /// <paramref name="localSeat"/> marks the column this device controls.
+    /// </summary>
+    public static void DrawSimultaneousNameEntry(DrawList dl, Game game, double time, int? localSeat)
+    {
+        var loc = game.Localizer;
+        dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
+        Hud.DrawScoreboard(dl, game, time);
+        Stadium.DrawStands(dl, time * 20, time);
+        Stadium.DrawWall(dl, loc["name.enter_both"], game.Round);
+        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
+        dl.FillRect(0, Layout.FieldTop + 20, Screen.Width, 60, Palette.Black.WithAlpha(230));
+        PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 24, loc["name.enter_both"], Palette.HudCyan, 0.8, TextAlign.Center);
+        for (int seat = 0; seat < 2; seat++)
+        {
+            var slot = game.NameSlots[seat];
+            var color = PlayerColor(seat);
+            double cx = seat == 0 ? Screen.Width * 0.27 : Screen.Width * 0.73;
+            string label = loc.Format("hud.player", seat + 1);
+            if (localSeat == seat) label += " (" + loc["name.you"] + ")";
+            PixelFont.Draw(dl, cx, Layout.FieldTop + 34, label, color, 0.7, TextAlign.Center);
+            double y = Layout.FieldTop + 50;
+            for (int i = 0; i < 3; i++)
+            {
+                double x = cx - 18 + i * 18;
+                bool cur = !slot.Done && slot.Cursor == i;
+                var letterColor = slot.Done ? color : cur && Math.Sin(time * 10) > 0 ? Palette.White : color;
+                PixelFont.Draw(dl, x, y, slot.Letters[i].ToString(), letterColor, 1.8, TextAlign.Center);
+                if (cur)
+                {
+                    PixelFont.Draw(dl, x, y - 8, "↑", Palette.HudYellow, 0.8, TextAlign.Center);
+                    PixelFont.Draw(dl, x, y + 16, "↓", Palette.HudYellow, 0.8, TextAlign.Center);
+                }
+            }
+            if (slot.Done) PixelFont.Draw(dl, cx, Layout.FieldTop + 70, loc["name.ready"], Palette.HudGreen, 0.7, TextAlign.Center);
+            var a = seat == 0 ? DemoP1 : DemoP2Human;
+            a.Pose = slot.Done ? Pose.Celebrate : Pose.Idle;
+            AthleteSprite.Draw(dl, cx + (seat == 0 ? -40 : 40), Layout.FieldBottom - 4, a, time);
+        }
+        PixelFont.Draw(dl, Screen.Width / 2, Screen.Height - 14, loc["name.hint"], Palette.HudGreen, 0.6, TextAlign.Center);
     }
 
     public static void DrawEventIntro(DrawList dl, Game game, double time)

@@ -20,10 +20,17 @@ public sealed class RelayClient : IAsyncDisposable
     private readonly RelayTransport _transport;
     private readonly TaskCompletionSource<MatchSettings> _match = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public RelayClient(Uri hubUrl, Action<HttpConnectionOptions>? configure = null)
+    /// <param name="hubUrl">The relay hub, e.g. <c>https://paf.example.com/hub</c>.</param>
+    /// <param name="accessKey">Shared key of the relay (its <c>Relay:AccessKey</c>), or null when it has none.</param>
+    /// <param name="configure">Extra connection options (tests use it to reach an in-memory server).</param>
+    public RelayClient(Uri hubUrl, string? accessKey = null, Action<HttpConnectionOptions>? configure = null)
     {
         _connection = new HubConnectionBuilder()
-            .WithUrl(hubUrl, options => configure?.Invoke(options))
+            .WithUrl(hubUrl, options =>
+            {
+                if (!string.IsNullOrEmpty(accessKey)) options.AccessTokenProvider = () => Task.FromResult<string?>(accessKey);
+                configure?.Invoke(options);
+            })
             .Build();
         _transport = new RelayTransport(_connection);
 

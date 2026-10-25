@@ -2,5 +2,6 @@
 @using PrankAndField.UI
 @inject IConfiguration Configuration
 
-@* RelayUrl (wwwroot/appsettings.json) is the SignalR hub of the online relay; empty hides the ONLINE button. *@
-<GameCanvas RelayUrl="@Configuration["RelayUrl"]" />
+@* RelayUrl (wwwroot/appsettings.json) is the SignalR hub of the online relay; empty hides the ONLINE button.
+   RelayKey is its access key: left empty in the repo, the deploy workflow fills it from the RELAY_KEY secret. *@
+<GameCanvas RelayUrl="@Configuration["RelayUrl"]" RelayKey="@Configuration["RelayKey"]" />

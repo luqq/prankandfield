@@ -94,6 +94,21 @@
 .paf-touch-action { border-color: #f8e858; }
 .paf-touch-start { flex: 0.6; border-color: var(--paf-red); }
 
+.paf-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #9aa0b4;
+  white-space: nowrap;
+}
+
+.paf-credit-logo { flex: none; }
+
+@media (max-width: 640px) {
+  .paf-credit-text { display: none; }
+}
+
 @media (pointer: coarse) {
   .paf-touch { display: flex; }
 }

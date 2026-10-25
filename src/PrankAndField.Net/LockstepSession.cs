@@ -21,6 +21,8 @@ public sealed class LockstepSession
     private readonly Dictionary<int, ulong> _localChecksums = new();
     private readonly Dictionary<int, ulong> _remoteChecksums = new();
     private double _accumulator;
+    private int _unsampledMask;
+    private bool _sampledLocal;
 
     public LockstepSession(MatchSettings settings, IGameTransport transport, Game? game = null)
     {
@@ -70,16 +72,19 @@ public sealed class LockstepSession
 
     /// <summary>
     /// Wall-clock driver for the host loop: runs <see cref="TryStep"/> once per elapsed 1/60 s with the
-    /// current local mask. Returns the number of ticks simulated.
+    /// current local mask. A quick tap seen on a frame that samples no tick is kept for the next sample,
+    /// so it is never lost. Returns the number of ticks simulated.
     /// </summary>
     public int Advance(double seconds, int localMask)
     {
+        _unsampledMask |= localMask;
         _accumulator += Math.Min(seconds, 0.25);
         int simulated = 0;
         while (_accumulator >= Game.TickSeconds)
         {
             _accumulator -= Game.TickSeconds;
-            if (TryStep(localMask)) simulated++;
+            if (TryStep(_unsampledMask | localMask)) simulated++;
+            if (_sampledLocal) _unsampledMask = 0;
         }
         return simulated;
     }
@@ -91,11 +96,13 @@ public sealed class LockstepSession
     /// </summary>
     public bool TryStep(int localMask)
     {
+        _sampledLocal = false;
         Receive();
         if (IsDesynced) return false;
 
         if (NextLocalTick <= CurrentTick + Settings.InputDelay)
         {
+            _sampledLocal = true;
             _inputs[LocalSeat][NextLocalTick] = localMask;
             _transport.Send(new InputMessage(LocalSeat, NextLocalTick, [localMask]));
             NextLocalTick++;

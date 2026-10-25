@@ -14,6 +14,7 @@ builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy =>
 var app = builder.Build();
 
 app.UseCors();
+app.UseRelayAccess();
 app.MapGet("/health", (RoomRegistry rooms) => Results.Ok(new { status = "ok", rooms = rooms.RoomCount }));
 app.MapHub<MatchHub>(MatchHub.Path);
 

@@ -43,10 +43,10 @@ public sealed class GameHost
     public OnlineMatch? Online { get; private set; }
 
     /// <summary>Opens a room on the relay at <paramref name="hubUrl"/>; the other player joins with its code.</summary>
-    public OnlineMatch CreateOnline(Uri hubUrl) => Online = OnlineMatch.Create(hubUrl, _localGame.Localizer);
+    public OnlineMatch CreateOnline(Uri hubUrl, string? accessKey = null) => Online = OnlineMatch.Create(hubUrl, accessKey, _localGame.Localizer);
 
     /// <summary>Joins the room <paramref name="code"/> on the relay at <paramref name="hubUrl"/>.</summary>
-    public OnlineMatch JoinOnline(Uri hubUrl, string code) => Online = OnlineMatch.Join(hubUrl, code, _localGame.Localizer);
+    public OnlineMatch JoinOnline(Uri hubUrl, string code, string? accessKey = null) => Online = OnlineMatch.Join(hubUrl, accessKey, code, _localGame.Localizer);
 
     /// <summary>Closes the online match and goes back to the local game where it was left.</summary>
     public async Task LeaveOnlineAsync()
@@ -101,6 +101,7 @@ public sealed class GameHost
     public double[] Present()
     {
         _sequencer.Drain(Game);
+        _renderer.LocalSeat = Online?.Session?.LocalSeat;
         var dl = _renderer.Render(Game);
         var events = _sequencer.Take();
         // Only the local board is persisted; an online match's board is discarded with it.

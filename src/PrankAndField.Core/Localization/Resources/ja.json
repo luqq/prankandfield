@@ -13,6 +13,9 @@
   "title.insert_coin": "コインを入れてください",
   "name.enter": "名前を入力してください プレイヤー{0}",
   "name.hint": "走るボタンで文字を変更 - ジャンプで決定",
+  "name.enter_both": "名前を入力してください",
+  "name.ready": "OK",
+  "name.you": "あなた",
   "hud.score": "スコア",
   "hud.world_record": "世界記録",
   "hud.qualify": "標準記録",
@@ -105,5 +108,9 @@
   "online.failed": "接続できませんでした: {0}",
   "online.leave": "退出",
   "online.close": "閉じる",
-  "online.controls": "P1かP2の操作で自分の選手を動かします"
+  "online.controls": "P1かP2の操作で自分の選手を動かします",
+  "touch.run": "走る",
+  "touch.action": "ジャンプ / 投げる",
+  "touch.start": "スタート",
+  "credit.by": "デザイン・開発: {0}"
 }

@@ -63,6 +63,55 @@ public class DeterminismTests
         Assert.Throws<InvalidOperationException>(() => new Game().StartOnlineCredit());
     }
 
+    [Fact]
+    public void EachOnlineSeatTypesOnlyItsOwnNameAtTheSameTime()
+    {
+        var game = new Game(online: true);
+        game.StartOnlineCredit();
+        Assert.True(game.SimultaneousNameEntry);
+
+        void Press(InputFrame p1, InputFrame p2)
+        {
+            game.Tick(p1, p2);
+            game.Tick(InputFrame.None, InputFrame.None);
+        }
+
+        // Both type on the same tick: each press only changes the presser's own slot.
+        Press(new InputFrame(Up: true), new InputFrame(Down: true));
+        Assert.Equal("BAA", game.NameSlots[0].Text);
+        Assert.Equal("?AA", game.NameSlots[1].Text);
+
+        // P2's START confirms P2 only; P1 keeps typing.
+        Press(InputFrame.None, new InputFrame(Start: true));
+        Assert.True(game.NameSlots[1].Done);
+        Assert.False(game.NameSlots[0].Done);
+        Assert.Equal(GameState.NameEntry, game.State);
+
+        Press(InputFrame.None, new InputFrame(Up: true));
+        Assert.Equal("?AA", game.NameSlots[1].Text);
+
+        // ArrowUp sends up and jump together online: it only changes the letter.
+        Press(new InputFrame(Up: true, Action: true), InputFrame.None);
+        Assert.Equal("CAA", game.NameSlots[0].Text);
+        Assert.Equal(0, game.NameSlots[0].Cursor);
+        Press(new InputFrame(Down: true), InputFrame.None);
+        Press(new InputFrame(Action: true), InputFrame.None);
+        Press(new InputFrame(Up: true), InputFrame.None);
+        Press(new InputFrame(Start: true), InputFrame.None);
+        Assert.Equal(GameState.EventIntro, game.State);
+        Assert.Equal("BBA", game.Players[0].Name);
+        Assert.Equal("?AA", game.Players[1].Name);
+    }
+
+    [Fact]
+    public void OfflineTwoPlayerGamesStillTakeTurnsAtNameEntry()
+    {
+        var game = new Game();
+        game.Tick(InputFrame.None, new InputFrame(Start: true));
+        Assert.Equal(GameState.NameEntry, game.State);
+        Assert.False(game.SimultaneousNameEntry);
+    }
+
     /// <summary>Two bots play a credit up to the medal ceremony; returns the masks and checksum of every tick.</summary>
     private static (List<(int P1, int P2)> Masks, List<ulong> Checksums) PlayTwoPlayerCredit(uint seed)
     {

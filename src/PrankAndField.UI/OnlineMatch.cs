@@ -29,9 +29,9 @@ public sealed class OnlineMatch : IAsyncDisposable
     private readonly Localizer _localizer;
     private readonly CancellationTokenSource _cts = new();
 
-    private OnlineMatch(Uri hubUrl, Localizer localizer)
+    private OnlineMatch(Uri hubUrl, string? accessKey, Localizer localizer)
     {
-        _client = new RelayClient(hubUrl);
+        _client = new RelayClient(hubUrl, accessKey);
         _localizer = localizer;
         _client.OpponentLeft += () =>
         {
@@ -58,17 +58,17 @@ public sealed class OnlineMatch : IAsyncDisposable
     public bool IsOver => Status is OnlineStatus.Finished or OnlineStatus.OpponentLeft or OnlineStatus.Desynced or OnlineStatus.Failed;
 
     /// <summary>Opens a room as P1. Returns immediately; follow <see cref="Status"/>.</summary>
-    public static OnlineMatch Create(Uri hubUrl, Localizer localizer)
+    public static OnlineMatch Create(Uri hubUrl, string? accessKey, Localizer localizer)
     {
-        var match = new OnlineMatch(hubUrl, localizer);
+        var match = new OnlineMatch(hubUrl, accessKey, localizer);
         _ = match.RunAsync(null);
         return match;
     }
 
     /// <summary>Joins an existing room as P2. Returns immediately; follow <see cref="Status"/>.</summary>
-    public static OnlineMatch Join(Uri hubUrl, string code, Localizer localizer)
+    public static OnlineMatch Join(Uri hubUrl, string? accessKey, string code, Localizer localizer)
     {
-        var match = new OnlineMatch(hubUrl, localizer);
+        var match = new OnlineMatch(hubUrl, accessKey, localizer);
         _ = match.RunAsync(code.Trim().ToUpperInvariant());
         return match;
     }

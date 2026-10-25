@@ -11,6 +11,9 @@ public sealed class GameRenderer
 {
     private readonly DrawList _list = new();
 
+    /// <summary>Seat played on this device in an online match (marked on shared screens), or null offline.</summary>
+    public int? LocalSeat { get; set; }
+
     public DrawList Render(Game game)
     {
         var dl = _list;
@@ -22,7 +25,8 @@ public sealed class GameRenderer
                 Scenes.DrawTitle(dl, game, time);
                 break;
             case GameState.NameEntry:
-                Scenes.DrawTextEntry(dl, game, time, record: false);
+                if (game.SimultaneousNameEntry) Scenes.DrawSimultaneousNameEntry(dl, game, time, LocalSeat);
+                else Scenes.DrawTextEntry(dl, game, time, record: false);
                 break;
             case GameState.RecordEntry:
                 Scenes.DrawTextEntry(dl, game, time, record: true);

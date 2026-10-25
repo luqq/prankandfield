@@ -62,7 +62,7 @@ public class LockstepSessionTests
             p1.TryStep(frame == 0 ? action : 0);
             p2.TryStep(0);
             link.Pump();
-            entry.Add(p1.Game.EntryCursor);
+            entry.Add(p1.Game.NameSlots[0].Cursor);
         }
 
         // Tick 3 is the first one that carries the press, so the cursor moves when it is simulated.
@@ -132,6 +132,26 @@ public class LockstepSessionTests
         // Without the other peer only the four delay ticks can run, out of six attempted.
         Assert.Equal(4, p1.Advance(0.1 + 1e-9, 0));
         Assert.Equal(4, p1.CurrentTick);
+    }
+
+    [Fact]
+    public void ATapOnAFrameWithoutATickIsNotLost()
+    {
+        var link = new InMemoryLink();
+        var (p1, p2) = Match(link, delay: 2);
+        var action = new InputFrame(Action: true).ToMask();
+
+        // A short frame runs no tick: the tap must wait for the next sampled tick instead of vanishing.
+        p1.Advance(Game.TickSeconds / 4, action);
+        for (int frame = 0; frame < 6; frame++)
+        {
+            p1.Advance(Game.TickSeconds, 0);
+            p2.Advance(Game.TickSeconds, 0);
+            link.Pump();
+        }
+
+        Assert.Equal(1, p1.Game.NameSlots[0].Cursor);
+        Assert.Equal(p1.Game.Checksum(), p2.Game.Checksum());
     }
 
     [Fact]
