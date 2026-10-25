@@ -3,18 +3,23 @@ namespace PrankAndField.Core.Events;
 public enum ThrowState
 {
     Approach,
-    WindUp,     // button held, angle counting up, athlete still moving
+    WindUp,     // button held, angle counting up, athlete planted where he pressed
     Flight,
     Landed,
 }
 
-/// <summary>Javelin throw: approach, hold to set the angle, release before the line.</summary>
+/// <summary>
+/// Javelin throw: approach, press to plant and hold to set the angle, release. The mark is measured
+/// from the foul line, so planting early costs distance.
+/// </summary>
 public sealed class JavelinSimulation : FieldEventSimulation
 {
     private double _flightTime;
     private double _flightDuration;
     private double _launchSpeed;
     private double _launchX;
+    private double _runUpSpeed;
+    private double _flightLength;
     private double _holdSeconds;
     private bool _foul;
     private bool _birdHit;
@@ -34,6 +39,7 @@ public sealed class JavelinSimulation : FieldEventSimulation
     public double JavelinY { get; private set; }
     public double JavelinAngle { get; private set; }
     public bool JavelinVisible { get; private set; }
+    /// <summary>Mark of the throw in progress: metres from the foul line to where the javelin is (or will land).</summary>
     public double Distance { get; private set; }
     public double ApexHeight { get; private set; }
     public bool BirdHit => _birdHit;
@@ -58,38 +64,27 @@ public sealed class JavelinSimulation : FieldEventSimulation
         {
             case ThrowState.Approach:
                 RunStep(a, e, dt);
-                if (e.ActionPressed && a.Runner.SpeedCm > 0)
+                if (a.X > LineX)
                 {
+                    Foul(a);
+                }
+                else if (e.ActionPressed && a.Runner.SpeedCm > 0)
+                {
+                    // The thrower plants his feet here; the run-up speed is kept for the launch.
+                    _runUpSpeed = a.Runner.SpeedMetersPerSecond;
+                    a.Runner.SpeedCm = 0;
                     State = ThrowState.WindUp;
                     ShowAngle = true;
                     Angle = 0;
                     a.Pose = Pose.Throw;
                 }
-                else if (a.X > LineX)
-                {
-                    Foul(a);
-                }
                 break;
 
             case ThrowState.WindUp:
-                {
-                    // Like the arcade, you can keep tapping RUN while the throw button is held.
-                    double before = a.X;
-                    a.Runner.ApplyEdges(e);
-                    a.Runner.Integrate(dt);
-                    a.AdvanceAnim(a.X - before);
-                    a.Pose = Pose.Throw;
-                    // The angle climbs while the button is held and parks at 90; the throw happens on release.
-                    Angle = Math.Min(90, Angle + Rules.JavelinAngleRate * dt);
-                    if (a.X > LineX)
-                    {
-                        Foul(a);
-                    }
-                    else if (!e.ActionHeld)
-                    {
-                        Release(a);
-                    }
-                }
+                a.Pose = Pose.Throw;
+                // The angle climbs while the button is held and parks at 90; the throw happens on release.
+                Angle = Math.Min(90, Angle + Rules.JavelinAngleRate * dt);
+                if (!e.ActionHeld) Release(a);
                 break;
 
             case ThrowState.Flight:
@@ -103,8 +98,9 @@ public sealed class JavelinSimulation : FieldEventSimulation
                     double t = Math.Min(_flightTime, _flightDuration);
                     double p = _flightDuration > 0 ? t / _flightDuration : 1;
                     double holdBonus = 1 + Rules.JavelinRunHoldBonus * Math.Min(1, _holdSeconds / Math.Max(0.1, _flightDuration));
-                    Distance = _baseDistance * holdBonus;
-                    JavelinX = _launchX + Distance * p;
+                    _flightLength = _baseDistance * holdBonus;
+                    Distance = _launchX + _flightLength - LineX;
+                    JavelinX = _launchX + _flightLength * p;
                     JavelinY = 1.8 + 4 * ApexHeight * p * (1 - p);
                     JavelinAngle = Angle * (1 - 2 * p); // nose up then down
                     if (!_birdHit && JavelinY > Rules.JavelinBirdApex && p < 0.5)
@@ -118,7 +114,8 @@ public sealed class JavelinSimulation : FieldEventSimulation
                         JavelinAngle = -50;
                         State = ThrowState.Landed;
                         Cue(AudioCue.SfxLand);
-                        CompleteAttempt(Attempt.Of(Distance), 2.4);
+                        if (Distance > 0) CompleteAttempt(Attempt.Of(Distance), 2.4);
+                        else Foul(a, keepJavelin: true); // landed behind the line
                     }
                 }
                 break;
@@ -133,11 +130,11 @@ public sealed class JavelinSimulation : FieldEventSimulation
         State = ThrowState.Flight;
         _flightTime = 0;
         _releaseTimer = 0.6;
-        _launchSpeed = Rules.JavelinLaunchSpeed(a.Runner.SpeedMetersPerSecond);
+        _launchSpeed = Rules.JavelinLaunchSpeed(_runUpSpeed);
         _launchX = a.X;
-        a.Runner.SpeedCm = 0; // stops dead at the release point
         _baseDistance = Rules.JavelinDistance(_launchSpeed, Angle);
-        Distance = _baseDistance;
+        _flightLength = _baseDistance;
+        Distance = _launchX + _flightLength - LineX;
         ApexHeight = Math.Max(2, Ballistics.PeakHeight(_launchSpeed, Angle) * 1.4);
         _flightDuration = 1.2 + 0.025 * _baseDistance + ApexHeight * 0.03;
         JavelinVisible = true;
@@ -147,12 +144,12 @@ public sealed class JavelinSimulation : FieldEventSimulation
         Cue(AudioCue.SfxThrow);
     }
 
-    private void Foul(Athlete a)
+    private void Foul(Athlete a, bool keepJavelin = false)
     {
         _foul = true;
         a.Runner.SpeedCm = 0;
         a.Pose = Pose.Stumble;
-        JavelinVisible = false;
+        JavelinVisible = keepJavelin;
         CompleteAttempt(Attempt.Fouled);
     }
 

@@ -85,10 +85,10 @@ public sealed class Bot
             case JavelinSimulation jv when jv.CurrentAthlete.PlayerIndex == _player && jv.Phase == AttemptPhase.Active:
                 if (jv.State == ThrowState.Approach)
                 {
-                    if (a!.X >= jv.LineX - TakeoffMargin - 5.0) action = true;
+                    if (a!.X >= jv.LineX - TakeoffMargin) action = true;
                     else run = Tap(dt);
                 }
-                else if (jv.State == ThrowState.WindUp) { action = jv.Angle < 42; run = Tap(dt); }
+                else if (jv.State == ThrowState.WindUp) action = jv.Angle < 42;
                 else if (jv.State == ThrowState.Flight) run = true; // hold RUN for the extra distance
                 break;
             case HammerSimulation hm when hm.CurrentAthlete.PlayerIndex == _player && hm.Phase == AttemptPhase.Active:

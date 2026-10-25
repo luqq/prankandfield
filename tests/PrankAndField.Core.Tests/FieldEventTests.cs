@@ -32,6 +32,18 @@ public class LongJumpTests
     }
 
     [Fact]
+    public void LandingShortOfTheSandIsAFoulNotANegativeMark()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11) { TakeoffMargin = 12 }; // takes off far too early and lands on the runway
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+        var cues = SimulationRunner.DrainCues(sim);
+        Assert.Contains(AudioCue.VoiceFoul, cues);
+        Assert.DoesNotContain(AudioCue.VoiceMark, cues);
+    }
+
+    [Fact]
     public void RunningIntoThePitIsAFoul()
     {
         var sim = New();
@@ -93,7 +105,7 @@ public class JavelinTests
     }
 
     [Fact]
-    public void TheThrowerStopsAtTheReleasePoint()
+    public void TheThrowerStopsAsSoonAsHePressesThrow()
     {
         var sim = New();
         var bot = new Bot(0, 11);
@@ -101,7 +113,7 @@ public class JavelinTests
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             var jv = (JavelinSimulation)s;
-            if (jv.CurrentTry == 1 && jv.State is ThrowState.Flight or ThrowState.Landed)
+            if (jv.CurrentTry == 1 && jv.State is ThrowState.WindUp or ThrowState.Flight or ThrowState.Landed)
             {
                 releaseX ??= jv.CurrentAthlete.X;
                 Assert.Equal(releaseX.Value, jv.CurrentAthlete.X, 6);
@@ -111,6 +123,24 @@ public class JavelinTests
             return (bot.NextForSimulation(s), InputFrame.None);
         });
         Assert.NotNull(releaseX);
+    }
+
+    [Fact]
+    public void TheMarkIsMeasuredFromTheFoulLine()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11) { TakeoffMargin = 6 }; // plants 6 m before the line
+        double? landedX = null, launchX = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var jv = (JavelinSimulation)s;
+            if (jv.CurrentTry == 1 && jv.State == ThrowState.WindUp) launchX ??= jv.CurrentAthlete.X;
+            if (jv.CurrentTry == 1 && jv.State == ThrowState.Landed) landedX ??= jv.JavelinX;
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
+        Assert.NotNull(landedX);
+        Assert.True(launchX < sim.LineX - 5, $"planted at {launchX}");
+        Assert.Equal(Rules.Snap(landedX!.Value - sim.LineX), sim.AttemptsFor(0)[0].Mark!.Value, 6);
     }
 
     [Fact]
@@ -151,7 +181,7 @@ public class JavelinTests
     public void ASteepPowerfulThrowHitsTheBird()
     {
         var sim = New();
-        var bot = new Bot(0, 14) { TakeoffMargin = 5 }; // wind up early: at full sprint the 85 degree hold covers 8 m
+        var bot = new Bot(0, 14);
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             var f = bot.NextForSimulation(s);
