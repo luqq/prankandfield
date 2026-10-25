@@ -62,7 +62,7 @@ public class LockstepSessionTests
             p1.TryStep(frame == 0 ? action : 0);
             p2.TryStep(0);
             link.Pump();
-            entry.Add(p1.Game.EntryCursor);
+            entry.Add(p1.Game.NameSlots[0].Cursor);
         }
 
         // Tick 3 is the first one that carries the press, so the cursor moves when it is simulated.

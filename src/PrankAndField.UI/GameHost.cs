@@ -101,6 +101,7 @@ public sealed class GameHost
     public double[] Present()
     {
         _sequencer.Drain(Game);
+        _renderer.LocalSeat = Online?.Session?.LocalSeat;
         var dl = _renderer.Render(Game);
         var events = _sequencer.Take();
         // Only the local board is persisted; an online match's board is discarded with it.

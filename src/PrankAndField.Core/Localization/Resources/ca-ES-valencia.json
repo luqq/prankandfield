@@ -13,6 +13,9 @@
   "title.insert_coin": "INSERIU MONEDA",
   "name.enter": "ESCRIVIU EL VOSTRE NOM, JUGADOR {0}",
   "name.hint": "ELS BOTONS DE CÓRRER CANVIEN LA LLETRA - BOTAR CONFIRMA",
+  "name.enter_both": "ESCRIVIU ELS VOSTRES NOMS",
+  "name.ready": "LLEST",
+  "name.you": "TU",
   "hud.score": "PUNTS",
   "hud.world_record": "RÈCORD DEL MÓN",
   "hud.qualify": "MÍNIMA",
@@ -105,5 +108,9 @@
   "online.failed": "NO S'HA POGUT CONNECTAR: {0}",
   "online.leave": "EIXIR",
   "online.close": "TANCAR",
-  "online.controls": "USA ELS CONTROLS DE J1 O J2: TOTS DOS MOUEN EL TEU ATLETA"
+  "online.controls": "USA ELS CONTROLS DE J1 O J2: TOTS DOS MOUEN EL TEU ATLETA",
+  "touch.run": "CÓRRER",
+  "touch.action": "BOTAR / LLANÇAR",
+  "touch.start": "INICI",
+  "credit.by": "Dissenyat i desenvolupat per {0}"
 }

@@ -13,6 +13,9 @@
   "title.insert_coin": "INSERTE MONEDA",
   "name.enter": "ESCRIBE TU NOMBRE, JUGADOR {0}",
   "name.hint": "LOS BOTONES DE CORRER CAMBIAN LA LETRA - SALTAR CONFIRMA",
+  "name.enter_both": "ESCRIBID VUESTROS NOMBRES",
+  "name.ready": "LISTO",
+  "name.you": "TÚ",
   "hud.score": "PUNTOS",
   "hud.world_record": "RÉCORD MUNDIAL",
   "hud.qualify": "MÍNIMA",
@@ -105,5 +108,9 @@
   "online.failed": "NO SE PUDO CONECTAR: {0}",
   "online.leave": "SALIR",
   "online.close": "CERRAR",
-  "online.controls": "USA LOS CONTROLES DE J1 O J2: LOS DOS MUEVEN A TU ATLETA"
+  "online.controls": "USA LOS CONTROLES DE J1 O J2: LOS DOS MUEVEN A TU ATLETA",
+  "touch.run": "CORRER",
+  "touch.action": "SALTAR / LANZAR",
+  "touch.start": "INICIO",
+  "credit.by": "Diseñado y desarrollado por {0}"
 }

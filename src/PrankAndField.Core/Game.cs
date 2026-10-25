@@ -97,6 +97,17 @@ public sealed class Game
     public char[] EntryLetters { get; } = ['A', 'A', 'A'];
     public int EntryCursor { get; private set; }
     public int EntryRecordRank { get; private set; }
+
+    /// <summary>
+    /// Online name entry: each seat types its own name at the same time with its own controls, and the
+    /// credit starts once both confirmed. Offline the players still take turns through <see cref="EntryLetters"/>.
+    /// </summary>
+    public bool SimultaneousNameEntry { get; private set; }
+
+    /// <summary>Per-seat name being typed while <see cref="SimultaneousNameEntry"/> is on.</summary>
+    public IReadOnlyList<NameSlot> NameSlots => _nameSlots;
+
+    private readonly NameSlot[] _nameSlots = [new(), new()];
     public double EntryMark { get; private set; }
 
     /// <summary>Set when the record board changed; the host saves it and calls <see cref="MarkRecordsSaved"/>.</summary>
@@ -134,7 +145,9 @@ public sealed class Game
         switch (State)
         {
             case GameState.Title: TickTitle(); break;
-            case GameState.NameEntry: TickTextEntry(isRecord: false); break;
+            case GameState.NameEntry:
+                if (SimultaneousNameEntry) TickSimultaneousNameEntry(); else TickTextEntry(isRecord: false);
+                break;
             case GameState.EventIntro: if (StateTime >= 3.2 || AnyStart()) StartEvent(); break;
             case GameState.Event: TickEvent(); break;
             case GameState.EventOutcome: if (StateTime >= 3.6 || (StateTime > 0.8 && AnyStart())) AfterOutcome(); break;
@@ -228,6 +241,8 @@ public sealed class Game
         }
         EntryPlayer = 0;
         StartTextEntry(Players[0].Name);
+        SimultaneousNameEntry = IsOnline && PlayerCount == 2;
+        for (int i = 0; i < _nameSlots.Length; i++) _nameSlots[i].Reset(Players[i].Name);
         SetState(GameState.NameEntry);
         Cue(AudioCue.SongNameEntry);
     }
@@ -292,6 +307,39 @@ public sealed class Game
                 EnterEventIntro(EventKind.Dash100m);
             }
         }
+    }
+
+    private void TickSimultaneousNameEntry()
+    {
+        for (int seat = 0; seat < 2; seat++)
+        {
+            var slot = _nameSlots[seat];
+            if (slot.Done) continue;
+            // Only this seat's own controls: online each browser drives one seat.
+            var e = _edges[seat];
+            int idx = Alphabet.IndexOf(slot.Letters[slot.Cursor]);
+            if (e.Run2Pressed || e.RightPressed || e.UpPressed)
+            {
+                slot.Letters[slot.Cursor] = Alphabet[(idx + 1) % Alphabet.Length];
+                Cue(AudioCue.SfxMenuMove);
+            }
+            else if (e.Run1Pressed || e.LeftPressed || e.DownPressed)
+            {
+                slot.Letters[slot.Cursor] = Alphabet[(idx - 1 + Alphabet.Length) % Alphabet.Length];
+                Cue(AudioCue.SfxMenuMove);
+            }
+            bool accept = e.StartPressed;
+            if (e.ActionPressed)
+            {
+                Cue(AudioCue.SfxMenuSelect);
+                if (slot.Cursor < 2) slot.Cursor++; else accept = true;
+            }
+            if (!accept) continue;
+            slot.Done = true;
+            Players[seat].Name = slot.Text;
+            Cue(AudioCue.SfxMenuSelect);
+        }
+        if (_nameSlots[0].Done && _nameSlots[1].Done) EnterEventIntro(EventKind.Dash100m);
     }
 
     // ------------------------------------------------------------------ events
@@ -479,6 +527,13 @@ public sealed class Game
         h.Add(EntryPlayer);
         h.Add(EntryCursor);
         foreach (char c in EntryLetters) h.Add(c);
+        h.Add(SimultaneousNameEntry);
+        foreach (var slot in _nameSlots)
+        {
+            h.Add(slot.Cursor);
+            h.Add(slot.Done);
+            foreach (char c in slot.Letters) h.Add(c);
+        }
         foreach (var p in Players)
         {
             h.Add(p.Score);
