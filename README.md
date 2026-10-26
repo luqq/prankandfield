@@ -16,7 +16,7 @@ projects; the same Razor component runs in a browser (Blazor WebAssembly) and in
 | `src/PrankAndField.Core` | Game logic only: events, running/ballistics model, rules and qualifying table, scoring, world records (JSON persistence), the credit state machine and the localizer. No rendering, no audio playback. |
 | `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]`, a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache), stadium, HUD and all screens. Backend-agnostic. |
 | `src/PrankAndField.Audio` | Songs (notes + syllables), sound ids, voice lines and the cue mapping. Serialized to the JavaScript synthesizer. |
-| `src/PrankAndField.Net` | Online play: deterministic lockstep session (input delay, checksum exchange), wire messages and the transport abstraction, plus an in-memory link for local play and tests. Not wired into the UI yet. |
+| `src/PrankAndField.Net` | Online play: deterministic lockstep session (input delay, checksum exchange), wire messages and the transport abstraction, plus an in-memory link for local play and tests. |
 | `src/PrankAndField.Net.Client` | SignalR client of the relay: creates or joins a room and exposes the match as an `IGameTransport`. |
 | `src/PrankAndField.Server` | Relay server (ASP.NET Core + SignalR): private rooms by code, forwards inputs and checksums. Docker image for amd64/arm64; see its README. |
 | `src/PrankAndField.UI` | Shared Razor Class Library: the `GameCanvas` component, `GameHost` (composes the three layers) and `prankandfield.js` (canvas backend, Web Audio synth with formant "robot singing", speech announcer, keyboard/gamepad/touch input, persistence). |
@@ -53,7 +53,7 @@ every push to `main` (or manually from the Actions tab). Enable it once in the r
 *Settings → Pages → Build and deployment → Source: GitHub Actions*. The workflow rewrites `<base href>` to the
 repository path, adds `.nojekyll` so the `_framework` folder is served, and copies `index.html` to `404.html`.
 
-## Online play (branch `main-online`)
+## Online play
 
 The **ONLINE** button in the toolbar opens a room on the relay server (`src/PrankAndField.Server`) and shows a
 five-letter code and an invite link (`?sala=CODE`); the other player types the code or opens the link. Each
@@ -95,6 +95,11 @@ Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` 
 Later rounds raise the standards (`Rules.cs`). Every 100,000 points earns an extra chance. World records are
 credited to the three-letter name you enter at the start of the credit; the game never asks for initials again.
 
+## Project notes
+
+Architecture of the online mode, deployment (Pages, relay image, server VM), decisions and open items are
+documented in Spanish under [`docs/`](docs/README.md). Agents start at [`AGENTS.md`](AGENTS.md).
+
 ## Localization
 
 English is the reference; Spanish (es-ES), Valencian (ca-ES-valencia) and Japanese (ja) are included as
@@ -113,9 +118,10 @@ original compositions written for this tribute, not transcriptions of the arcade
 
 ## Hidden practice menu
 
-Press `P` (or `F2`) on the title screen: pick any event with up/down, the round with left/right (the
-standards update live), and start it with JUMP. `P` goes back. Handy to test a single event without playing
-the whole round.
+Enter the Konami code on the title screen (up, up, down, down, left, right, left, right, B, A; B is RUN 2 and
+A is RUN 1 or JUMP): pick any event with up/down, the round with left/right (the standards update live), and
+start it with JUMP. `Esc` (or Back) goes back. Handy to test a single event without playing the whole round.
+Using it locks online play until the page is reloaded.
 
 ## Debug / practice helpers
 

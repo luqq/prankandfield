@@ -1,0 +1,1 @@
+Leer [AGENTS.md](AGENTS.md) antes de abordar cualquier tarea en este repositorio: resume qué es el proyecto, cómo compilar y probar, las reglas de trabajo (PR contra `main`, el usuario fusiona, determinismo, secretos) y enlaza la documentación de `docs/`.
