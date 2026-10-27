@@ -59,9 +59,10 @@ public static class EventRenderers
         Stadium.DrawStands(dl, scrollForStands, time);
         Stadium.DrawWall(dl, loc[race.Kind.Key()], game.Round);
 
-        // bottom bar: show the human speed
-        var human = race.Athletes.FirstOrDefault(a => !a.IsCpu) ?? race.Athletes[0];
-        Hud.DrawSpeedBar(dl, game, human.Runner.SpeedCm);
+        // bottom bar: the human speed; with two human runners (local two-player or online) each gets a bar.
+        var humans = race.Athletes.Where(a => !a.IsCpu).OrderBy(a => a.PlayerIndex).ToList();
+        if (humans.Count >= 2) Hud.DrawSpeedBars(dl, game, humans);
+        else Hud.DrawSpeedBar(dl, game, (humans.Count == 1 ? humans[0] : race.Athletes[0]).Runner.SpeedCm);
 
         // start-sequence banners
         string banner = race.Phase switch
