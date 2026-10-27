@@ -34,7 +34,23 @@ Lo que quedaba abierto al cerrar la primera etapa del online (26/10/2026). Nada 
       `FieldEventSimulation`.
 - [ ] Online en el host de escritorio (habría que comprobar que `Math.Sin/Cos` dan lo mismo que en WASM).
 
+## Hyper Sports (modo añadido el 27/10/2026)
+
+- [ ] **Online**: el relay no transmite el modo, así que las partidas online son siempre de Prank & Field.
+      `Game.StartOnlineCredit(GameMode)` ya acepta el modo; falta llevarlo en el mensaje de inicio de sala
+      (`PrankAndField.Net`/`Server`) y redesplegar la imagen del servidor a la vez que el juego, porque el
+      cambio de protocolo rompe la compatibilidad entre versiones.
+- [ ] Afinar la jugabilidad con jugadores reales. Las mínimas, los récords y las constantes de `Rules.cs`
+      (natación, tiro al plato, potro, arco, triple salto, halterofilia) se calibraron con el bot de los
+      tests; conviene probar sobre todo el ritmo de los platos dobles, la ventana de ¡RESPIRA! y la deriva de
+      la barra en halterofilia.
+- [ ] Decoración propia del modo en el título (hoy comparte el estadio de atletismo) y una pantalla de
+      introducción con un dibujo por prueba más elaborado.
+- [ ] La CPU solo participa en natación (como en las carreras). Valorar un rival automático en las demás.
+- [ ] Si otros hilos cambian `Hud`, `Stadium`, `AthleteSprite` o los `EventRenderers` en paralelo,
+      revisar los conflictos al fusionar: Hyper Sports añade métodos y casos nuevos en esos archivos.
+
 ## Documentación
 
-- [ ] Las secciones «Online play» y «Hidden practice menu» del `README.md` deben seguir al día si cambia la
-      UI.
+- [ ] Las secciones «Online play», «Hyper Sports events» y «Hidden practice menu» del `README.md` deben
+      seguir al día si cambia la UI.

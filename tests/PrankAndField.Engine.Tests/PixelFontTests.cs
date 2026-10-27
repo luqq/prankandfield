@@ -14,7 +14,7 @@ public class PixelFontTests
         foreach (var (key, value) in Localizer.Load(culture))
         {
             if (key.StartsWith("voice.") || key == "lang.tts") continue; // spoken, not drawn
-            string drawn = value.Replace("{0}", "0"); // format placeholders become digits before drawing
+            string drawn = value.Replace("{0}", "0").Replace("{1}", "0"); // format placeholders become digits before drawing
             var missing = drawn.Where(ch => !PixelFont.CanDraw(ch)).Distinct().ToList();
             Assert.True(missing.Count == 0, $"{culture}:{key} has undrawable characters: {string.Join(" ", missing)}");
         }

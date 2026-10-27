@@ -148,6 +148,7 @@ public sealed class GameHost
         var snapshot = new Dictionary<string, object?>
         {
             ["state"] = g.State.ToString(),
+            ["mode"] = g.Mode.ToString(),
             ["event"] = g.CurrentEvent.ToString(),
             ["round"] = g.Round,
             ["players"] = g.PlayerCount,
@@ -167,6 +168,14 @@ public sealed class GameHost
             snapshot["pose"] = a.Pose.ToString();
             switch (sim)
             {
+                case Core.Events.SwimmingSimulation sw:
+                    snapshot["phase"] = sw.Phase.ToString();
+                    snapshot["time"] = Math.Round(sw.RaceTime, 2);
+                    snapshot["breathe"] = sw.BreathPrompt(0);
+                    snapshot["choking"] = sw.IsChoking(0);
+                    snapshot["breaths"] = sw.Breaths(0);
+                    snapshot["missed"] = sw.MissedBreaths(0);
+                    break;
                 case Core.Events.HurdlesSimulation h:
                     snapshot["phase"] = h.Phase.ToString();
                     snapshot["time"] = Math.Round(h.RaceTime, 2);
@@ -205,6 +214,48 @@ public sealed class GameHost
                     snapshot["sub"] = hj.State.ToString();
                     snapshot["try"] = hj.CurrentTry;
                     snapshot["bar"] = hj.BarHeight;
+                    break;
+                case Core.Events.SkeetSimulation sk:
+                    snapshot["phase"] = sk.Phase.ToString();
+                    snapshot["launched"] = sk.Launched;
+                    snapshot["hits"] = sk.Hits;
+                    snapshot["streak"] = sk.Streak;
+                    snapshot["leftSight"] = sk.TargetInSight(0);
+                    snapshot["rightSight"] = sk.TargetInSight(1);
+                    snapshot["targets"] = sk.Targets.Where(t => !t.Hit).Select(t => new { t.Side, x = Math.Round(t.X, 2), y = Math.Round(t.Y, 2), t.Golden }).ToList();
+                    break;
+                case Core.Events.VaultSimulation v:
+                    snapshot["phase"] = v.Phase.ToString();
+                    snapshot["sub"] = v.State.ToString();
+                    snapshot["try"] = v.CurrentTry;
+                    snapshot["board"] = v.BoardX;
+                    snapshot["twists"] = v.Twists;
+                    snapshot["stick"] = v.StickWindowOpen;
+                    break;
+                case Core.Events.ArcherySimulation ar:
+                    snapshot["phase"] = ar.Phase.ToString();
+                    snapshot["sub"] = ar.State.ToString();
+                    snapshot["arrow"] = ar.ArrowIndex;
+                    snapshot["points"] = ar.Points;
+                    snapshot["wind"] = ar.Wind;
+                    snapshot["targetY"] = Math.Round(ar.TargetY, 2);
+                    break;
+                case Core.Events.TripleJumpSimulation tj:
+                    snapshot["phase"] = tj.Phase.ToString();
+                    snapshot["sub"] = tj.State.ToString();
+                    snapshot["try"] = tj.CurrentTry;
+                    snapshot["board"] = tj.BoardX;
+                    snapshot["jumpPhase"] = tj.JumpPhase;
+                    snapshot["contactLeft"] = Math.Round(tj.ContactLeft, 2);
+                    break;
+                case Core.Events.WeightliftingSimulation wl:
+                    snapshot["phase"] = wl.Phase.ToString();
+                    snapshot["sub"] = wl.State.ToString();
+                    snapshot["try"] = wl.CurrentTry;
+                    snapshot["weight"] = wl.Weight;
+                    snapshot["power"] = Math.Round(wl.PowerFraction, 2);
+                    snapshot["press"] = wl.JerkPrompt;
+                    snapshot["balance"] = Math.Round(wl.Balance, 2);
                     break;
             }
         }

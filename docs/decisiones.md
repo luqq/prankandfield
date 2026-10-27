@@ -18,6 +18,11 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | Jugador 2 | Piel morena (`Palette.SkinP2`) | Distinguir a los atletas |
 | Crédito | «Diseñado y desarrollado por Hiryu Soft» con un logo de dragón, pequeño a la derecha | Petición del usuario |
 | Ramas | Todo en `main`; el usuario fusiona los PR a mano | Se probó a aislar el online en `main-online` y luego se decidió unificar |
+| Modo Hyper Sports (27/10) | Seleccionable en el título: el menú pasa de 2 a 4 entradas (Prank & Field / Hyper Sports × 1 o 2 jugadores) recorridas con ↑↓ o los botones de correr. Mismo motor: `GameMode` en `Game`, `EventKind` 6-11, `MarkUnit` por prueba (segundos, metros, puntos, platos, kg), `Rules`, `Scoring` y `WorldRecords` con 12 filas | Petición del usuario: «el mismo motor de juego y personajes». Una lista de 4 entradas funciona con teclado, mando y botones táctiles sin añadir ejes |
+| Pruebas de Hyper Sports | Natación (respirar al aviso), tiro al plato (dos escopetas, miras fijas, 20 platos, dobles y plato dorado), potro (trampolín, impulso, giros, clavar la caída, nota sobre 10), tiro con arco (diana que sube y baja, viento, 6 flechas), triple salto (pulsar en cada apoyo) y halterofilia (arrancar, ¡empuja!, equilibrio). Las de carrera y de intentos reutilizan `RaceSimulation` y `FieldEventSimulation`; las de un solo turno usan la nueva `TurnEventSimulation` | Mecánicas del arcade de 1984 adaptadas a los dos botones de correr y el de saltar |
+| Hyper Sports online | No en esta fase: `Game.StartOnlineCredit(GameMode)` ya acepta el modo, pero el relay no lo transmite y el online juega siempre Prank & Field | Cambiar el protocolo rompe la compatibilidad entre clientes hasta redesplegar la imagen del servidor; se deja para un PR propio |
+| Récords de Hyper Sports | La tabla pasa a 12 filas; los JSON de 6 filas guardados antes se cargan y conservan los valores por defecto de las nuevas pruebas | No perder los récords locales de nadie |
+| Calibrado de Hyper Sports | Mínimas y récords ajustados con el bot de los tests (`tests/.../Support/Bot.cs`, 9-16 pulsaciones/s): natación 440 cm/s máx. (11 pulsaciones/s ≈ 24,6 s), triple salto ≈ 2× longitud, potro nota 5 + tabla 1,5 + impulso 1,5 + 0,5 por giro + 0,3 por clavar, pesas +5 kg por levantamiento válido | Que un jugador medio supere la ronda 1 y los récords sean alcanzables pero no triviales |
 
 ## Historia del online (PRs de `luqq/prankandfield`)
 
@@ -33,6 +38,8 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #8 | 25/10 | Fusión de `main-online` en `main`. Desde aquí el online se publica en `luqq.github.io/prankandfield` |
 | #9 | 25/10 | Konami Code para el modo práctica y bloqueo del online tras usarlo; piel morena del J2 |
 | #10 | 25/10 | Longitud: caer antes de la arena (`Rules.LongJumpPitStart` = 1 m tras la tabla) es nulo. Jabalina: el atleta se planta al pulsar lanzar y la marca se mide desde la línea de nulo |
+| #11 | 26/10 | Documentación para agentes: `AGENTS.md`, `docs/` |
+| Hyper Sports | 27/10 | Modo Hyper Sports en el título con sus seis pruebas, textos en los 4 idiomas, sonidos, tests y calibrado (rama `claude/project-thread-ikowl7`) |
 
 Todos están fusionados en `main` (comprobado el 26/10/2026; `main` = `acc72b4`).
 

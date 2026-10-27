@@ -3,7 +3,9 @@
 A vector-graphics tribute to Konami's **Track & Field** (*Hyper Olympic*, 1983): the six events, the
 mustachioed athletes, the red-framed scoreboard, the packed grandstand, independently scrolling lanes,
 the QUALIFY standards, the three-slot WORLD RECORD board with initials, the bird and the mole easter eggs,
-and short original chiptune jingles **sung by a robotic voice**.
+and short original chiptune jingles **sung by a robotic voice**. The title screen also offers a
+**Hyper Sports** mode (the 1984 sequel): swimming, skeet shooting, long horse, archery, triple jump and
+weightlifting, played with the same engine, athletes, scoreboard and record board.
 
 Everything is .NET 10. The game logic, the vector engine and the audio definitions are separate
 projects; the same Razor component runs in a browser (Blazor WebAssembly) and in a desktop window
@@ -79,7 +81,10 @@ dotnet run --project src/PrankAndField.Web
 | START | `Enter` or `1` | `2` | Start |
 | Menu up / down | `↑` / `↓` | | D-pad |
 
-Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` (or the run buttons) pick 1 or 2 players.
+Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` (or the run buttons) walk the four
+entries of the menu: **Prank & Field** or **Hyper Sports**, each for 1 or 2 players. START (or player 2's START,
+which always picks 2 players) begins the credit in the highlighted mode; the record ticker at the bottom shows
+the records of that mode.
 
 ### Events (round-1 standards match the arcade)
 
@@ -92,8 +97,21 @@ Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` 
 | Hammer | Press RUN once to spin (each turn is faster). Press THROW when the ball turns blue behind you, release when it glows red in front: that half turn is a 45 degree throw. Any release in the front half is legal but shorter off-centre; behind you is a foul. Ten turns make you dizzy. | 73.00 m |
 | High jump | The approach is automatic. Press JUMP near the bar; while held the angle counts down from 80. Tap RUN in the air to lift over the bar. Clear only on the third try after two misses for the mole. | 2.30 m |
 
+### Hyper Sports events (same engine, one round = the six in this order)
+
+| Event | Technique | Qualify |
+|---|---|---|
+| 100 m freestyle | Alternate RUN to stroke (the computer swims the other lane). Every few seconds **BREATHE!** pops up over your swimmer: press JUMP while it shows for a boost. Miss it and you swallow water and lose your rhythm; breathing with no prompt wastes a stroke. | 32.00 s |
+| Skeet shooting | 20 clays fly out of the two houses and cross the two fixed sights. RUN 1 fires the left gun, RUN 2 the right one (JUMP fires whichever sight has a clay in it). Doubles from the 11th clay; every 7th clay is golden (1000) and every 5 hits in a row pay 500. The mark is the number of hits. | 14 hits |
+| Long horse | Run, press JUMP at the springboard (the closer to it, the better), press again while you are in the handstand on the horse to push off, alternate RUN in the air for twists (half a twist per press, up to four; a half twist left over is a messy landing) and press JUMP just before touching down to stick it. Judges score out of 10. | 8.50 pts |
+| Archery | The target bobs up and down 10 m away. Hold THROW to raise the bow (the angle box counts up), release to shoot; the wind (top left) lifts or drops the arrow. Six arrows, 10 points for the gold; three golds in a row pay a bonus. | 30 pts |
+| Triple jump | Run and press JUMP before the board for the hop; hold to set the angle like the long jump. Each time your feet touch down, **PRESS!** shows for a moment: press again (and hold for the angle) for the step and the jump. A late press is a flat, slow bounce. The mark is measured from the board; past the board or short of the pit is a FOUL. | 12.50 m |
+| Weightlifting | The bar starts at the qualifying weight. Alternate RUN to clean it to your chest within five seconds, press JUMP when **PRESS!** shows, then hold it overhead while tapping RUN 1 / RUN 2 to keep the balance meter centred. Three white lights make it a good lift and add 5 kg for your next try. | 150 kg |
+
 Later rounds raise the standards (`Rules.cs`). Every 100,000 points earns an extra chance. World records are
 credited to the three-letter name you enter at the start of the credit; the game never asks for initials again.
+The record board has one row per event of both modes; boards saved before Hyper Sports existed load fine and
+keep the Hyper Sports defaults.
 
 ## Project notes
 
@@ -120,8 +138,9 @@ original compositions written for this tribute, not transcriptions of the arcade
 
 Enter the Konami code on the title screen (up, up, down, down, left, right, left, right, B, A; B is RUN 2 and
 A is RUN 1 or JUMP): pick any event with up/down, the round with left/right (the standards update live), and
-start it with JUMP. `Esc` (or Back) goes back. Handy to test a single event without playing the whole round.
-Using it locks online play until the page is reloaded.
+start it with JUMP. `Esc` (or Back) goes back. The menu lists the events of the mode highlighted on the title
+(Prank & Field or Hyper Sports) and keeps its player count. Handy to test a single event without playing the
+whole round. Using it locks online play until the page is reloaded.
 
 ## Debug / practice helpers
 
@@ -130,6 +149,7 @@ From the browser console:
 ```js
 await paf.state()                 // simulation snapshot
 paf.jumpTo("hammer", 2)           // practice an event at a given round
+paf.jumpTo("archery", 1, 2)       // Hyper Sports events: swimming, skeet, longhorse, archery, triplejump, weightlifting
 paf.setLanguage("ca-ES-valencia")
 ```
 
@@ -141,3 +161,7 @@ Layout, palette, standards and tricks were taken from the arcade attract screens
 [Museum of the Game](https://arcade-museum.com/Videogame/track-field) and the
 [TASVideos submission](https://tasvideos.org/5673S) (speed in cm/s, 1442 cm/s human maximum, hurdle penalties).
 Default world records are the real 1983 records, with the EEE/FFF/GGG placeholder initials of the original.
+The Hyper Sports events follow the 1984 sequel ([Wikipedia](https://en.wikipedia.org/wiki/Hyper_Sports)): two
+fixed sights in the skeet, the breathing prompt in the pool, the push and the twists on the long horse, the
+bobbing archery target with wind, and the PRESS! prompt of the clean and jerk; their standards and records
+were tuned for this engine rather than copied from the arcade.

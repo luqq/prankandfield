@@ -87,9 +87,35 @@ public static class AthleteSprite
                     double w = Math.Sin(time * 6) * 25;
                     return new BodyPose(20, -15, -20, -15, 95 + w, -20, 95 - w, -20, w * 0.6, 2);
                 }
+            case Pose.Swim:
+                return SwimCycle(phase, 88, 13);
+            case Pose.Breathe:
+                return SwimCycle(phase, 72, 12) with { ArmNear = 150, ElbowNear = -20 };
+            case Pose.Aim:
+                return new BodyPose(14, -6, -14, -6, 86, 8, 78, 62, 4, 0);
+            case Pose.Handstand:
+                return new BodyPose(4, -4, -4, -4, 178, 0, -178, 0, 0, 0);
+            case Pose.Clean:
+                return new BodyPose(62, -92, 58, -88, 58, 108, 54, 112, 12, 6);
+            case Pose.Lift:
+                return new BodyPose(12, -6, -12, -6, 172, 0, -172, 0, 0, 0);
+            case Pose.Collapse:
+                return new BodyPose(92, -94, 86, -90, 64, 18, 52, 22, 32, 10);
             default:
                 return new BodyPose(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
+    }
+
+    /// <summary>
+    /// Front crawl: the body lies flat (lean close to 90), the legs flutter and the arms wheel round, half a turn apart.
+    /// </summary>
+    private static BodyPose SwimCycle(double phase, double lean, double lower)
+    {
+        double f = phase * 2 * Math.PI;
+        double kick = 14 * Math.Sin(f * 2);
+        double armNear = (phase * 360) % 360 - 180;      // -180..180: a full wheel per cycle
+        double armFar = ((phase + 0.5) * 360) % 360 - 180;
+        return new BodyPose(-78 + kick, -12, -82 - kick, -12, armNear, 10, armFar, 10, lean, lower);
     }
 
     /// <summary>Running cycle. Knees bend backwards (negative), elbows bend forwards (positive) like a real runner.</summary>

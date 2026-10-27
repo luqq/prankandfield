@@ -117,6 +117,55 @@ public class CueTests
     }
 
     [Fact]
+    public void MarksAreSpokenInTheUnitOfTheirEvent()
+    {
+        Assert.Equal(MarkSpeech.Time, CueMap.SpeechFor(EventKind.Swimming100m));
+        Assert.Equal(MarkSpeech.Hits, CueMap.SpeechFor(EventKind.SkeetShooting));
+        Assert.Equal(MarkSpeech.Score, CueMap.SpeechFor(EventKind.LongHorse));
+        Assert.Equal(MarkSpeech.Points, CueMap.SpeechFor(EventKind.Archery));
+        Assert.Equal(MarkSpeech.Distance, CueMap.SpeechFor(EventKind.TripleJump));
+        Assert.Equal(MarkSpeech.Kilograms, CueMap.SpeechFor(EventKind.Weightlifting));
+
+        var game = new Game(seed: 6);
+        game.JumpToEvent(EventKind.Weightlifting);
+        var seq = new CueSequencer();
+        var bot = new PrankAndField.Core.Tests.Support.Bot(0, 11);
+        var marks = new List<(double, double)>();
+        double t = 0;
+        while (game.State != GameState.EventOutcome && t < 200)
+        {
+            game.Tick(bot.Next(game), InputFrame.None);
+            seq.Drain(game);
+            foreach (var (kind, a, b) in seq.Take())
+                if (kind == (double)AudioEventKind.SpeakMark) marks.Add((a, b));
+            t += Game.TickSeconds;
+        }
+        Assert.NotEmpty(marks);
+        Assert.All(marks, m => Assert.Equal((double)MarkSpeech.Kilograms, m.Item2));
+        Assert.All(marks, m => Assert.Equal(0, m.Item1 % 100));
+
+        foreach (var culture in Localizer.SupportedCultures)
+        {
+            using var doc = JsonDocument.Parse(AudioCatalog.VoicePhrasesJson(new Localizer(culture)));
+            foreach (var key in new[] { "score", "points", "hits", "kilograms" })
+                Assert.Contains("{0}", doc.RootElement.GetProperty(key).GetString());
+            Assert.Contains("{1}", doc.RootElement.GetProperty("score").GetString());
+        }
+    }
+
+    [Fact]
+    public void HyperSportsSoundsHaveIds()
+    {
+        foreach (var cue in new[] { AudioCue.SfxSplash, AudioCue.SfxBreath, AudioCue.SfxGasp, AudioCue.SfxShot, AudioCue.SfxClayBreak, AudioCue.SfxBow, AudioCue.SfxArrowHit, AudioCue.SfxSpring, AudioCue.SfxClank, AudioCue.SfxLights })
+        {
+            var e = Assert.Single(CueMap.Map(cue));
+            Assert.Equal(AudioEventKind.PlaySound, e.Kind);
+            Assert.InRange(e.Id, 17, 26);
+        }
+        Assert.Equal(26, Enum.GetValues<SoundId>().Length);
+    }
+
+    [Fact]
     public void CatalogRoundTripsThroughJson()
     {
         string json = AudioCatalog.ToJson();

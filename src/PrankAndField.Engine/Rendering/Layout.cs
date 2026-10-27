@@ -30,6 +30,12 @@ public static class Layout
     /// <summary>Vertical squash applied to implement flight heights (javelin, hammer, birds) so arcs stay on screen.</summary>
     public const double FlightSquash = 0.35;
 
+    /// <summary>Skeet range: vertical scale of the clay flights, taller than the track so the arcs read well.</summary>
+    public const double SkeetPxPerMeterY = 20;
+
+    /// <summary>Archery range: one scale for both axes so the arrow flies at its true angle (10 m fit on screen).</summary>
+    public const double ArcheryPxPerMeter = 20;
+
     /// <summary>Where the followed athlete sits on screen while the camera scrolls.</summary>
     public const double FollowPx = 72;
 

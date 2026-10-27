@@ -29,6 +29,35 @@ public sealed class Bot
     /// <summary>Metres before the board / line at which the bot takes off or throws.</summary>
     public double TakeoffMargin { get; set; } = 0.6;
 
+    /// <summary>Taps per second in the air during a vault (each alternated tap is half a twist).</summary>
+    public double TwistTaps { get; set; } = 8;
+
+    /// <summary>Take-off angle held for every phase of the triple jump.</summary>
+    public double TripleJumpAngle { get; set; } = 40;
+
+    /// <summary>When set, the archer aims this many metres off the centre on purpose (to test misses).</summary>
+    public double AimOffset { get; set; }
+
+    /// <summary>
+    /// Picks the bow angle that puts the arrow on the predicted centre of the target: the hold time, the
+    /// flight time, the drop and the wind are all known, so the bot scans the angles for the best one.
+    /// </summary>
+    private double AimAngle(ArcherySimulation ar)
+    {
+        double best = 0, bestErr = double.MaxValue;
+        for (double deg = 0; deg <= Rules.ArcheryMaxAngle; deg += 0.25)
+        {
+            double rad = deg * Math.PI / 180.0;
+            double flight = ar.TargetX / (Rules.ArrowSpeed * Math.Cos(rad));
+            double hold = deg / Rules.ArcheryAngleRate;
+            double y = Rules.ArcheryBowHeight + ar.TargetX * Math.Tan(rad) - Ballistics.G * ar.TargetX * ar.TargetX / (2 * Rules.ArrowSpeed * Rules.ArrowSpeed * Math.Cos(rad) * Math.Cos(rad))
+                       + ar.Wind * Rules.ArcheryWindLift;
+            double err = Math.Abs(y - (ar.TargetYAt(hold + flight) + AimOffset));
+            if (err < bestErr) { bestErr = err; best = deg; }
+        }
+        return best;
+    }
+
     /// <summary>Input for the whole game: presses Start on menus, plays the events.</summary>
     public InputFrame Next(Game game)
     {
@@ -58,6 +87,13 @@ public sealed class Bot
         var a = sim.AthleteFor(_player);
         switch (sim)
         {
+            case SwimmingSimulation sw:
+                if (sw.Phase == RacePhase.Running && a is not null && !a.Finished)
+                {
+                    run = Tap(dt);
+                    action = sw.BreathPrompt(_player); // breathe as soon as the prompt shows
+                }
+                break;
             case HurdlesSimulation h:
                 if (h.Phase == RacePhase.Running && a is not null && !a.Finished)
                 {
@@ -114,6 +150,54 @@ public sealed class Bot
                 }
                 else if (hj.State == HighJumpState.Rising) action = sim.Elapsed < _holdUntil;
                 else if (hj.State == HighJumpState.Airborne) run = Tap(dt, 14);
+                break;
+            case SkeetSimulation sk when sk.CurrentAthlete.PlayerIndex == _player && sk.Phase == TurnPhase.Active:
+                {
+                    // fire the gun whose sight has a clay in it, one press every other tick
+                    _pulse = !_pulse;
+                    bool left = sk.TargetInSight(0) && _pulse;
+                    bool right = sk.TargetInSight(1) && _pulse;
+                    return new InputFrame(Run1: left, Run2: right);
+                }
+            case VaultSimulation v when v.CurrentAthlete.PlayerIndex == _player && v.Phase == AttemptPhase.Active:
+                if (v.State == VaultState.Approach)
+                {
+                    if (a!.X >= v.BoardX - Rules.VaultBoardSweetSpot - 0.05) action = true;
+                    else run = Tap(dt);
+                }
+                else if (v.State == VaultState.OnHorse) action = v.HorseTime >= Rules.VaultPushBest - 0.02;
+                else if (v.State == VaultState.Flight)
+                {
+                    run = Tap(dt, TwistTaps);
+                    action = v.StickWindowOpen;
+                }
+                break;
+            case ArcherySimulation ar when ar.CurrentAthlete.PlayerIndex == _player && ar.Phase == TurnPhase.Active:
+                if (ar.State == ArcheryState.Aim)
+                {
+                    if (_holdUntil < 0) _holdUntil = AimAngle(ar);
+                    action = ar.Angle < _holdUntil - 0.6;
+                }
+                else _holdUntil = -1;
+                break;
+            case TripleJumpSimulation tj when tj.CurrentAthlete.PlayerIndex == _player && tj.Phase == AttemptPhase.Active:
+                if (tj.State == TripleJumpState.Approach)
+                {
+                    if (a!.X >= tj.BoardX - TakeoffMargin) action = true;
+                    else run = Tap(dt);
+                }
+                else if (tj.State == TripleJumpState.Rising) action = tj.Angle < TripleJumpAngle;
+                else if (tj.State == TripleJumpState.Contact) action = true;
+                break;
+            case WeightliftingSimulation wl when wl.CurrentAthlete.PlayerIndex == _player && wl.Phase == AttemptPhase.Active:
+                if (wl.State is LiftState.Ready or LiftState.Clean) run = Tap(dt);
+                else if (wl.State == LiftState.Jerk) action = wl.JerkPrompt;
+                else if (wl.State == LiftState.Hold)
+                {
+                    _pulse = !_pulse;
+                    if (wl.Balance > 0.25) return new InputFrame(Run1: _pulse);
+                    if (wl.Balance < -0.25) return new InputFrame(Run2: _pulse);
+                }
                 break;
         }
 

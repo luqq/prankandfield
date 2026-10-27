@@ -46,14 +46,23 @@ public static class Scenes
         dl.FillRect(40, 27, Screen.Width - 80, 1, Palette.HudCyan);
         PixelFont.Draw(dl, Screen.Width / 2, 30, loc["game.copyright"], Palette.HudCyan, 0.6, TextAlign.Center);
 
-        // menu
-        double my = 42;
-        for (int i = 0; i < 2; i++)
+        // menu: two columns (PRANK & FIELD / HYPER SPORTS), 1 or 2 players in each
+        for (int col = 0; col < 2; col++)
         {
-            bool sel = game.MenuSelection == i;
-            string label = loc[i == 0 ? "title.players_1" : "title.players_2"];
-            if (sel) PixelFont.Draw(dl, 92, my + i * 8, "→", Palette.HudRed, 0.9);
-            PixelFont.Draw(dl, 102, my + i * 8, label, sel ? Palette.White : Palette.Grey, 0.9);
+            var mode = col == 0 ? GameMode.TrackAndField : GameMode.HyperSports;
+            bool colSel = game.MenuMode == mode;
+            double cx = col == 0 ? 68 : 188;
+            PixelFont.Draw(dl, cx, 39, loc[mode.Key()], colSel ? Palette.HudYellow : Palette.Grey, 0.8, TextAlign.Center);
+            dl.FillRect(cx - 32, 46, 64, 0.8, colSel ? Palette.HudYellow : Palette.DarkGrey);
+            for (int i = 0; i < 2; i++)
+            {
+                int index = col * 2 + i;
+                bool sel = game.MenuSelection == index;
+                string label = loc[i == 0 ? "title.players_1" : "title.players_2"];
+                double ly = 49 + i * 7.5;
+                if (sel) PixelFont.Draw(dl, cx - 30, ly, "→", Palette.HudRed, 0.8);
+                PixelFont.Draw(dl, cx - 20, ly, label, sel ? Palette.White : Palette.Grey, 0.8);
+            }
         }
 
         if (Math.Sin(time * 4) > -0.2)
@@ -63,8 +72,9 @@ public static class Scenes
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 72, loc["title.controls_p2"], Palette.HudPink, 0.7, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 84, loc.Format("title.language", loc["lang.name"]), Palette.White, 0.7, TextAlign.Center);
 
-        // records ticker
-        var kind = (EventKind)((int)(time / 3) % 6);
+        // records ticker, over the events of the highlighted mode
+        var events = game.MenuMode.Events();
+        var kind = events[(int)(time / 3) % events.Length];
         var rec = game.Records.Best(kind);
         PixelFont.Draw(dl, 8, Screen.Height - 16, loc["hud.world_record"] + " " + loc[kind.Key()], Palette.HudGreen, 0.7);
         Hud.DrawMark(dl, 8, Screen.Height - 9, kind, rec.Mark, loc, Palette.HudYellow, Palette.HudGreen, 0.8);
@@ -163,7 +173,7 @@ public static class Scenes
         PixelFont.Draw(dl, Screen.Width / 2 - 36, Layout.FieldTop + 46, loc["hud.qualify"], Palette.HudGreen, 1, TextAlign.Right);
         Hud.DrawMark(dl, Screen.Width / 2 - 28, Layout.FieldTop + 46, game.CurrentEvent, Rules.QualifyingMark(game.CurrentEvent, game.Round), loc, Palette.HudCyan, Palette.HudGreen, 1);
         // instructions, wrapped on two lines if long
-        string instr = loc["instr." + game.CurrentEvent.Key()["event.".Length..]];
+        string instr = loc[game.CurrentEvent.InstructionKey()];
         var lines = Wrap(instr, 52);
         for (int i = 0; i < lines.Count && i < 3; i++)
             PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 62 + i * 8, lines[i], Palette.White, 0.7, TextAlign.Center);
@@ -175,10 +185,24 @@ public static class Scenes
             EventKind.Hurdles110m => Pose.Hurdle,
             EventKind.HammerThrow => Pose.Spin,
             EventKind.HighJump => Pose.Flop,
+            EventKind.Swimming100m => Pose.Swim,
+            EventKind.SkeetShooting or EventKind.Archery => Pose.Aim,
+            EventKind.LongHorse => Pose.Handstand,
+            EventKind.TripleJump => Pose.Fly,
+            EventKind.Weightlifting => Pose.Lift,
             _ => Pose.Run,
         };
         a.AnimPhase = (time * 2) % 1;
-        AthleteSprite.Draw(dl, 36, Layout.FieldTop + 96, a, time);
+        a.Rotation = game.CurrentEvent == EventKind.LongHorse ? 180 : 0;
+        double introY = game.CurrentEvent switch
+        {
+            EventKind.Swimming100m => Layout.FieldTop + 86,
+            EventKind.LongHorse => Layout.FieldTop + 72,
+            _ => Layout.FieldTop + 96,
+        };
+        AthleteSprite.Draw(dl, 36, introY, a, time);
+        a.Rotation = 0;
+        if (game.CurrentEvent == EventKind.Weightlifting) Stadium.DrawBarbell(dl, 36, introY - 29, 0, Rules.QualifyingMark(EventKind.Weightlifting, game.Round));
     }
 
     public static void DrawOutcome(DrawList dl, Game game, double time)
@@ -297,11 +321,12 @@ public static class Scenes
         dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
         PixelFont.Draw(dl, Screen.Width / 2, 10, loc["practice.title"], Palette.HudYellow, 1.6, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2, 30, loc.Format("practice.round", game.PracticeRound) + "  ←→", Palette.HudCyan, 1, TextAlign.Center);
-        PixelFont.Draw(dl, Screen.Width / 2, 44, loc[game.MenuSelection == 0 ? "title.players_1" : "title.players_2"], Palette.White, 0.8, TextAlign.Center);
+        PixelFont.Draw(dl, Screen.Width / 2, 44, loc[game.Mode.Key()] + " - " + loc[game.MenuPlayers == 1 ? "title.players_1" : "title.players_2"], Palette.White, 0.8, TextAlign.Center);
         dl.FillRect(16, Layout.FieldTop + 6, Screen.Width - 32, 76, Palette.Black.WithAlpha(235));
-        for (int i = 0; i < EventKindExtensions.InOrder.Length; i++)
+        var events = game.Mode.Events();
+        for (int i = 0; i < events.Length; i++)
         {
-            var kind = EventKindExtensions.InOrder[i];
+            var kind = events[i];
             double y = Layout.FieldTop + 12 + i * 11;
             bool sel = kind == game.PracticeEvent;
             if (sel) PixelFont.Draw(dl, 30, y, "→", Palette.HudRed, 1);

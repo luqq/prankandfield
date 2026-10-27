@@ -76,7 +76,10 @@ async function createBridge() {
   };
 }
 
-const EVENT_IDS = { dash: 0, longjump: 1, javelin: 2, hurdles: 3, hammer: 4, highjump: 5 };
+const EVENT_IDS = {
+  dash: 0, longjump: 1, javelin: 2, hurdles: 3, hammer: 4, highjump: 5,
+  swimming: 6, skeet: 7, longhorse: 8, archery: 9, triplejump: 10, weightlifting: 11,
+};
 
 /**
  * Console helpers for practice and debugging, e.g. `paf.jumpTo("hammer", 2)` or `await paf.state()`.
@@ -334,7 +337,7 @@ function handleAudio(kind, a, b) {
     case 2: audio.playSound(a); break;
     case 3: audio.speak(a); break;
     case 4: audio.stopMusic(); break;
-    case 5: audio.speakMark(a, b === 1); break;
+    case 5: audio.speakMark(a, b); break;
     case 6: audio.flightTone(a / 1000, b === 1); break;
     case 9: saveRecords(); break;
   }
@@ -757,6 +760,45 @@ class AudioEngine {
       case 16: // tick
         this.tone(t, 0.03, 1500, 1500, "square", 0.1);
         break;
+      case 17: // splash (the dive)
+        this.noise(t, 0.35, 900, 0.5, "lowpass");
+        this.tone(t, 0.2, 240, 90, "sine", 0.3);
+        break;
+      case 18: // breath
+        this.noise(t, 0.16, 1800, 0.25, "bandpass");
+        break;
+      case 19: // gasp: swallowed water
+        this.noise(t, 0.3, 500, 0.35, "lowpass");
+        this.tone(t, 0.25, 320, 140, "sawtooth", 0.12);
+        break;
+      case 20: // shotgun
+        this.noise(t, 0.2, 1400, 0.9, "lowpass");
+        this.tone(t, 0.1, 140, 40, "square", 0.45);
+        break;
+      case 21: // clay breaking
+        this.noise(t, 0.12, 3200, 0.5, "highpass");
+        for (let k = 0; k < 3; k++) this.tone(t + k * 0.04, 0.05, 2400 - k * 300, 1800, "square", 0.12);
+        break;
+      case 22: // bow release
+        this.tone(t, 0.08, 180, 90, "sawtooth", 0.2);
+        this.noise(t, 0.25, 2500, 0.2, "bandpass");
+        break;
+      case 23: // arrow in the target
+        this.noise(t, 0.08, 1800, 0.4, "lowpass");
+        this.tone(t, 0.14, 420, 380, "triangle", 0.3);
+        break;
+      case 24: // springboard / trap
+        this.tone(t, 0.14, 160, 620, "square", 0.2);
+        this.noise(t, 0.1, 1200, 0.15, "bandpass");
+        break;
+      case 25: // barbell clank
+        this.tone(t, 0.3, 900, 860, "triangle", 0.25);
+        this.tone(t, 0.25, 1350, 1300, "sine", 0.12);
+        this.noise(t, 0.06, 600, 0.3, "lowpass");
+        break;
+      case 26: // the judges' white lights
+        [660, 880, 1320].forEach((f, k) => this.tone(t + k * 0.12, 0.2, f, f, "square", 0.18));
+        break;
     }
   }
 
@@ -828,12 +870,16 @@ class AudioEngine {
     this.say(this.voices.phrases[String(id)], AudioEngine.URGENT.has(id));
   }
 
-  /** Announces a mark: `cents` hundredths of a second or of a metre. */
-  speakMark(cents, isTime) {
+  /**
+   * Announces a mark: `cents` hundredths of the mark, `unit` how to read it
+   * (0 distance, 1 time, 2 score out of ten, 3 points, 4 hits, 5 kilograms).
+   */
+  speakMark(cents, unit) {
     const whole = Math.floor(cents / 100);
     const frac = String(cents % 100).padStart(2, "0");
-    const template = isTime ? this.voices.time : this.voices.distance;
+    const v = this.voices;
+    const template = [v.distance, v.time, v.score, v.points, v.hits, v.kilograms][unit] || v.distance;
     if (!template) return;
-    this.say(template.replace("{0}", String(whole)).replace("{1}", frac), false);
+    this.say(template.replace("{0}", String(unit >= 3 ? Math.round(cents / 100) : whole)).replace("{1}", frac), false);
   }
 }

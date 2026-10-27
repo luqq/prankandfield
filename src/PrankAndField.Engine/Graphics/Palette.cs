@@ -77,6 +77,41 @@ public static class Palette
     public static readonly Rgba Bird = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba BirdBeak = Rgba.Hex(0xF8A020);
 
+    // Hyper Sports
+    public static readonly Rgba Water = Rgba.Hex(0x2878E0);
+    public static readonly Rgba WaterDark = Rgba.Hex(0x1C5CB8);
+    public static readonly Rgba WaterLight = Rgba.Hex(0x58A8F8);
+    public static readonly Rgba LaneRope = Rgba.Hex(0xF8E858);
+    public static readonly Rgba PoolDeck = Rgba.Hex(0xD8D8D0);
+    public static readonly Rgba Clay = Rgba.Hex(0xF07028);
+    public static readonly Rgba ClayDark = Rgba.Hex(0xB04810);
+    public static readonly Rgba ClayGold = Rgba.Hex(0xF8D020);
+    public static readonly Rgba House = Rgba.Hex(0x707880);
+    public static readonly Rgba Sight = Rgba.Hex(0xF8F8F8);
+    public static readonly Rgba SightHot = Rgba.Hex(0xF84040);
+    public static readonly Rgba Gun = Rgba.Hex(0x303030);
+    public static readonly Rgba Flash = Rgba.Hex(0xF8F080);
+    public static readonly Rgba Horse = Rgba.Hex(0xB06030);
+    public static readonly Rgba HorseTop = Rgba.Hex(0xD89050);
+    public static readonly Rgba HorseLeg = Rgba.Hex(0x808080);
+    public static readonly Rgba Springboard = Rgba.Hex(0xE8E8E8);
+    public static readonly Rgba TargetWhite = Rgba.Hex(0xF8F8F8);
+    public static readonly Rgba TargetBlack = Rgba.Hex(0x202020);
+    public static readonly Rgba TargetBlue = Rgba.Hex(0x3060E0);
+    public static readonly Rgba TargetRed = Rgba.Hex(0xE83030);
+    public static readonly Rgba TargetGold = Rgba.Hex(0xF8D820);
+    public static readonly Rgba TargetStand = Rgba.Hex(0x806040);
+    public static readonly Rgba Arrow = Rgba.Hex(0xE8D8A0);
+    public static readonly Rgba Fletching = Rgba.Hex(0xF84040);
+    public static readonly Rgba Bow = Rgba.Hex(0x9C6830);
+    public static readonly Rgba Platform = Rgba.Hex(0xA87848);
+    public static readonly Rgba PlatformEdge = Rgba.Hex(0x785030);
+    public static readonly Rgba Barbell = Rgba.Hex(0xC8C8C8);
+    public static readonly Rgba Plate = Rgba.Hex(0xE83030);
+    public static readonly Rgba PlateDark = Rgba.Hex(0x3050E0);
+    public static readonly Rgba LightOn = Rgba.Hex(0xF8F8F8);
+    public static readonly Rgba LightOff = Rgba.Hex(0x404040);
+
     // flags
     public static readonly Rgba FlagRed = Rgba.Hex(0xE02020);
     public static readonly Rgba FlagBlue = Rgba.Hex(0x2040C0);

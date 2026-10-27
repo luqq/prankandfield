@@ -56,4 +56,16 @@ public enum AudioCue
     SfxWhistle,
     SfxSpin,
     SfxTick,
+
+    // Hyper Sports effects
+    SfxSplash,     // dive / stroke in the pool
+    SfxBreath,     // a well-timed breath
+    SfxGasp,       // a missed breath
+    SfxShot,       // shotgun
+    SfxClayBreak,  // clay target shattered
+    SfxBow,        // arrow released
+    SfxArrowHit,   // arrow in the target
+    SfxSpring,     // springboard
+    SfxClank,      // barbell plates
+    SfxLights,     // the judges' lights
 }

@@ -24,6 +24,28 @@ public enum SoundId
     Whistle,
     Spin,
     Tick,
+    Splash,
+    Breath,
+    Gasp,
+    Shot,
+    ClayBreak,
+    Bow,
+    ArrowHit,
+    Spring,
+    Clank,
+    Lights,
+}
+
+/// <summary>How a spoken mark is read out: the Arg of a <see cref="AudioEventKind.SpeakMark"/> event.</summary>
+public enum MarkSpeech
+{
+    Distance = 0,
+    Time = 1,
+    /// <summary>A score out of ten with decimals ("9 point 30").</summary>
+    Score = 2,
+    Points = 3,
+    Hits = 4,
+    Kilograms = 5,
 }
 
 public enum AudioEventKind
@@ -32,7 +54,7 @@ public enum AudioEventKind
     PlaySound = 2,
     Speak = 3,
     StopMusic = 4,
-    /// <summary>Speak a mark: Id = hundredths of a second / metre, Arg = 1 for a time, 0 for a distance.</summary>
+    /// <summary>Speak a mark: Id = hundredths of the mark, Arg = a <see cref="MarkSpeech"/> value (0 distance, 1 time, 2 score, 3 points, 4 hits, 5 kg).</summary>
     SpeakMark = 5,
     /// <summary>Flight tone: Id = height in thousandths (0..1000), Arg = 1 while airborne, 0 to stop.</summary>
     FlightTone = 6,
@@ -110,6 +132,16 @@ public static class CueMap
         AudioCue.SfxWhistle => [new(AudioEventKind.PlaySound, (int)SoundId.Whistle)],
         AudioCue.SfxSpin => [new(AudioEventKind.PlaySound, (int)SoundId.Spin)],
         AudioCue.SfxTick => [new(AudioEventKind.PlaySound, (int)SoundId.Tick)],
+        AudioCue.SfxSplash => [new(AudioEventKind.PlaySound, (int)SoundId.Splash)],
+        AudioCue.SfxBreath => [new(AudioEventKind.PlaySound, (int)SoundId.Breath)],
+        AudioCue.SfxGasp => [new(AudioEventKind.PlaySound, (int)SoundId.Gasp)],
+        AudioCue.SfxShot => [new(AudioEventKind.PlaySound, (int)SoundId.Shot)],
+        AudioCue.SfxClayBreak => [new(AudioEventKind.PlaySound, (int)SoundId.ClayBreak)],
+        AudioCue.SfxBow => [new(AudioEventKind.PlaySound, (int)SoundId.Bow)],
+        AudioCue.SfxArrowHit => [new(AudioEventKind.PlaySound, (int)SoundId.ArrowHit)],
+        AudioCue.SfxSpring => [new(AudioEventKind.PlaySound, (int)SoundId.Spring)],
+        AudioCue.SfxClank => [new(AudioEventKind.PlaySound, (int)SoundId.Clank)],
+        AudioCue.SfxLights => [new(AudioEventKind.PlaySound, (int)SoundId.Lights)],
         _ => [],
     };
 
@@ -130,6 +162,18 @@ public static class CueMap
         VoiceId.Try3 => "voice.try3",
         VoiceId.Bonus => "voice.bonus",
         _ => throw new ArgumentOutOfRangeException(nameof(id)),
+    };
+
+    /// <summary>How the announcer reads a mark of the given event.</summary>
+    public static MarkSpeech SpeechFor(EventKind kind) => kind.Unit() switch
+    {
+        MarkUnit.Seconds => MarkSpeech.Time,
+        MarkUnit.Metres => MarkSpeech.Distance,
+        MarkUnit.Score => MarkSpeech.Score,
+        MarkUnit.Points => MarkSpeech.Points,
+        MarkUnit.Hits => MarkSpeech.Hits,
+        MarkUnit.Kilograms => MarkSpeech.Kilograms,
+        _ => MarkSpeech.Distance,
     };
 }
 
@@ -191,7 +235,8 @@ public static class AudioCatalog
 
     /// <summary>
     /// Voice phrases for the current language:
-    /// { "lang": "es-ES", "phrases": { "1": "..." }, "time": "{0} point {1} seconds", "distance": "{0} metres {1}" }.
+    /// { "lang": "es-ES", "phrases": { "1": "..." }, "time": "{0} point {1} seconds", "distance": "{0} metres {1}",
+    ///   "score": "{0} point {1}", "points": "{0} points", "hits": "{0} hits", "kilograms": "{0} kilograms" }.
     /// </summary>
     public static string VoicePhrasesJson(Localizer loc)
     {
@@ -203,6 +248,10 @@ public static class AudioCatalog
             phrases,
             time = loc["voice.time"],
             distance = loc["voice.distance"],
+            score = loc["voice.score"],
+            points = loc["voice.points"],
+            hits = loc["voice.hits"],
+            kilograms = loc["voice.kilograms"],
         }, Options);
     }
 }
@@ -223,7 +272,7 @@ public sealed class CueSequencer
         while (game.TryDequeueCue(out var cue)) Enqueue(cue);
         while (game.TryDequeueMark(out var mark))
         {
-            _pending.Add(new AudioEvent(AudioEventKind.SpeakMark, (int)Math.Round(mark.Mark * 100), mark.Kind.IsTimed() ? 1 : 0).ToTriplet());
+            _pending.Add(new AudioEvent(AudioEventKind.SpeakMark, (int)Math.Round(mark.Mark * 100), (int)CueMap.SpeechFor(mark.Kind)).ToTriplet());
         }
         // Continuous flight tone: one event per frame while something is airborne, one stop event afterwards.
         double? height = game.State == GameState.Event ? game.Simulation?.FlightHeight : null;
