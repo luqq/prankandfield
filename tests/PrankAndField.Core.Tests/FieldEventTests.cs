@@ -390,59 +390,258 @@ public class HammerTests
 
 public class HighJumpTests
 {
-    private static HighJumpSimulation New(uint seed = 1) => new(1, [new Athlete(0, false, "AAA")], new Rng(seed));
+    private static HighJumpSimulation New(uint seed = 1, int round = 1) => new(round, [new Athlete(0, false, "AAA")], new Rng(seed));
+
+    /// <summary>Runs up at the bot's rhythm and presses JUMP once the athlete passes <paramref name="takeoffX"/>, holding to <paramref name="angle"/>.</summary>
+    private static Bot Jumper(double tapsPerSecond = 9, double takeoffX = Rules.HighJumpZoneBest, double angle = 75) =>
+        new(0, tapsPerSecond) { HighJumpTakeoffX = takeoffX, HighJumpAngle = angle };
 
     [Fact]
-    public void AWellTimedJumpClearsTheBarAndRaisesIt()
+    public void AGoodJumpClearsTheBarAndRaisesItForTheNextTry()
     {
         var sim = New();
-        var bot = new Bot(0);
-        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        var bot = Jumper();
+        var bars = new List<double>();
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            if (bars.Count == 0 || bars[^1] != sim.BarHeightFor(0)) bars.Add(sim.BarHeightFor(0));
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
         Assert.True(sim.IsFinished);
         var tries = sim.AttemptsFor(0);
-        Assert.True(tries[0].Mark.HasValue, "first jump should clear");
-        Assert.Equal(2.30, tries[0].Mark!.Value);
-        Assert.True(sim.BarHeightFor(0) > 2.30);
+        Assert.Equal(2.30, tries[0].Mark);
+        Assert.Equal(2.34, tries[1].Mark);
+        Assert.Equal(2.38, tries[2].Mark);
+        Assert.Equal([2.30, 2.34, 2.38, 2.42], bars);
+        Assert.Equal(2.38, sim.MarkFor(0));
         Assert.True(sim.DidQualify(0));
+        Assert.Equal(0, sim.MissesFor(0));
+        var cues = SimulationRunner.DrainCues(sim);
+        Assert.DoesNotContain(AudioCue.SfxBarFall, cues);
+        Assert.Contains(AudioCue.VoiceMark, cues);
+    }
+
+    [Theory]
+    [InlineData(-1.8)]
+    [InlineData(-1.15)]
+    [InlineData(-0.5)]
+    public void AnywhereInsideTheZoneIsGoodEnoughForTheOpeningHeight(double takeoffX)
+    {
+        var sim = New();
+        var bot = Jumper(takeoffX: takeoffX);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.True(sim.AttemptsFor(0)[0].Mark.HasValue, $"take-off at {takeoffX} should clear 2.30");
     }
 
     [Fact]
-    public void TakingOffTooEarlyMisses()
+    public void TheApexSitsOverTheBarWhereverHeTakesOffInsideTheZone()
+    {
+        foreach (double takeoffX in new[] { -1.8, -1.2, -0.6 })
+        {
+            var sim = New();
+            var bot = Jumper(takeoffX: takeoffX);
+            double? landing = null, takeoff = null;
+            SimulationRunner.RunUntilFinished(sim, s =>
+            {
+                var hj = (HighJumpSimulation)s;
+                if (hj.CurrentTry == 1 && hj.State == HighJumpState.Airborne) { landing = hj.LandingX; takeoff = hj.TakeoffX; }
+                return (hj.CurrentTry == 1 ? bot.NextForSimulation(s) : InputFrame.None, InputFrame.None);
+            });
+            Assert.NotNull(landing);
+            Assert.Equal(-takeoff!.Value, landing!.Value, 2); // symmetric arc: apex at x = 0
+            Assert.True(landing > 0 && landing < 2.2, "lands on the mat");
+        }
+    }
+
+    [Fact]
+    public void TakingOffWellBeforeTheZoneBringsTheBarDown()
     {
         var sim = New();
+        var bot = Jumper(takeoffX: -2.5);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+        Assert.Equal(2.30, sim.BarHeightFor(0)); // a miss never raises the bar
+        Assert.Equal(3, sim.MissesFor(0));
+        Assert.Contains(AudioCue.SfxBarFall, SimulationRunner.DrainCues(sim));
+    }
+
+    [Fact]
+    public void TakingOffFarTooEarlyLandsShortOfTheBar()
+    {
+        var sim = New();
+        var bot = Jumper(takeoffX: -5.0);
+        bool crossed = false;
         SimulationRunner.RunUntilFinished(sim, s =>
         {
-            var hj = (HighJumpSimulation)s;
-            if (hj.Phase == AttemptPhase.Active && hj.State == HighJumpState.Approach && hj.CurrentAthlete.X >= -4.0)
-                return (new InputFrame(Action: true), InputFrame.None);
-            return (InputFrame.None, InputFrame.None);
+            crossed |= sim.CurrentAthlete.X >= 0;
+            return (bot.NextForSimulation(s), InputFrame.None);
         });
+        Assert.False(crossed, "never reached the bar plane");
+        Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+        Assert.DoesNotContain(AudioCue.SfxBarFall, SimulationRunner.DrainCues(sim));
+    }
+
+    [Fact]
+    public void TakingOffJustPastTheZoneStillJumpsButMeetsTheBarOnTheWayUp()
+    {
+        var sim = New();
+        var bot = Jumper(takeoffX: -0.25);
+        bool flew = false;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            flew |= ((HighJumpSimulation)s).State == HighJumpState.Airborne;
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
+        Assert.True(flew, "a late press is still a jump, not a crash");
         Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
         Assert.Contains(AudioCue.SfxBarFall, SimulationRunner.DrainCues(sim));
     }
 
     [Fact]
-    public void NeverJumpingRunsIntoTheBar()
+    public void RunningThroughWithoutJumpingKnocksTheBarOff()
     {
         var sim = New();
-        SimulationRunner.RunUntilFinished(sim, _ => (InputFrame.None, InputFrame.None));
+        var runner = Jumper(takeoffX: 10); // never reaches its take-off spot: just keeps running
+        SimulationRunner.RunUntilFinished(sim, s => (runner.NextForSimulation(s), InputFrame.None));
         Assert.True(sim.IsFinished);
         Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+        Assert.True(sim.CurrentAthlete.X <= Rules.HighJumpCrashX + 1e-9);
+        Assert.Equal(HighJumpState.Missed, sim.State);
+        Assert.Contains(AudioCue.SfxBarFall, SimulationRunner.DrainCues(sim));
+    }
+
+    [Fact]
+    public void AJogIsTooSlowToClearTheOpeningHeight()
+    {
+        var sim = New();
+        var bot = Jumper(tapsPerSecond: 5);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+        Assert.Null(sim.MarkFor(0));
+    }
+
+    [Theory]
+    [InlineData(45)]  // released too soon: flat and short on lift
+    [InlineData(90)]  // held to the end: straight up, the run-up is wasted
+    public void AFlatOrVerticalTakeoffMisses(double angle)
+    {
+        var sim = New();
+        var bot = Jumper(angle: angle);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+    }
+
+    [Fact]
+    public void AFasterRunUpJumpsHigher()
+    {
+        double PeakAt(double taps)
+        {
+            var sim = New();
+            var bot = Jumper(tapsPerSecond: taps);
+            double peak = 0;
+            SimulationRunner.RunUntilFinished(sim, s =>
+            {
+                var hj = (HighJumpSimulation)s;
+                if (hj.CurrentTry == 1 && hj.State == HighJumpState.Airborne) peak = hj.PeakHeight;
+                return (hj.CurrentTry == 1 ? bot.NextForSimulation(s) : InputFrame.None, InputFrame.None);
+            });
+            return peak;
+        }
+        double slow = PeakAt(7), fast = PeakAt(11);
+        Assert.True(fast > slow + 0.1, $"{fast} vs {slow}");
     }
 
     [Fact]
     public void TheMoleAppearsWhenYouClearOnlyTheThirdTry()
     {
         var sim = New();
-        var bot = new Bot(0);
+        var early = Jumper(takeoffX: -2.6); // knocks the bar
+        var good = Jumper();
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             var hj = (HighJumpSimulation)s;
-            if (hj.CurrentTry < 3) return (InputFrame.None, InputFrame.None); // fail the first two
+            var bot = hj.CurrentTry < 3 ? early : good;
             return (bot.NextForSimulation(s), InputFrame.None);
         });
-        Assert.True(sim.AttemptsFor(0)[2].Mark.HasValue);
+        var tries = sim.AttemptsFor(0);
+        Assert.True(tries[0].Foul && tries[1].Foul);
+        Assert.Equal(2.30, tries[2].Mark);
         Assert.Equal(Rules.BonusPoints, sim.BonusPoints[0]);
         Assert.Contains(AudioCue.SfxMole, SimulationRunner.DrainCues(sim));
+    }
+
+    [Fact]
+    public void AnIdleAttemptTimesOutAndCountsAsAMiss()
+    {
+        var sim = New();
+        var good = Jumper();
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var hj = (HighJumpSimulation)s;
+            return (hj.CurrentTry < 3 ? InputFrame.None : good.NextForSimulation(s), InputFrame.None);
+        }, maxSeconds: 120);
+        Assert.True(sim.IsFinished);
+        Assert.Equal(2, sim.MissesFor(0));
+        Assert.Equal(2.30, sim.AttemptsFor(0)[2].Mark);
+        Assert.Equal(Rules.BonusPoints, sim.BonusPoints[0]);
+    }
+
+    [Fact]
+    public void EachPlayerHasHisOwnBar()
+    {
+        var sim = new HighJumpSimulation(1, [new Athlete(0, false, "AAA"), new Athlete(1, false, "BBB")], new Rng(3));
+        var p1 = Jumper();
+        var p2 = new Bot(1, 9) { HighJumpTakeoffX = -2.6 }; // player 2 keeps missing
+        double? p2BarDuringP1Second = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var hj = (HighJumpSimulation)s;
+            if (hj.CurrentAthlete.PlayerIndex == 0 && hj.CurrentTry == 2) p2BarDuringP1Second = hj.BarHeightFor(1);
+            return (p1.NextForSimulation(s), p2.NextForSimulation(s));
+        }, maxSeconds: 240);
+        Assert.True(sim.IsFinished);
+        Assert.Equal(2.38, sim.MarkFor(0));
+        Assert.Null(sim.MarkFor(1));
+        Assert.Equal(2.30, p2BarDuringP1Second);
+        Assert.Equal(2.42, sim.BarHeightFor(0));
+        Assert.Equal(2.30, sim.BarHeightFor(1));
+    }
+
+    [Fact]
+    public void TheBarStartsAtTheQualifyingHeightOfTheRound()
+    {
+        Assert.Equal(2.30, New(round: 1).BarHeight);
+        Assert.Equal(2.34, New(round: 2).BarHeight);
+        Assert.Equal(2.40, New(round: 4).BarHeight);
+    }
+
+    [Fact]
+    public void TheTakeoffFactorPeaksOnTheLineAndCollapsesBeforeTheZone()
+    {
+        Assert.Equal(1.0, Rules.HighJumpTakeoffFactor(Rules.HighJumpZoneBest), 6);
+        Assert.Equal(1 - Rules.HighJumpZonePenalty, Rules.HighJumpTakeoffFactor(Rules.HighJumpZoneFar), 6);
+        Assert.Equal(1 - Rules.HighJumpZonePenalty, Rules.HighJumpTakeoffFactor(Rules.HighJumpZoneNear), 6);
+        Assert.True(Rules.HighJumpTakeoffFactor(Rules.HighJumpZoneFar - 0.3) < 0.8);
+        Assert.True(Rules.HighJumpTakeoffFactor(Rules.HighJumpZoneFar - 1.0) < 0.1);
+        // monotonic on either side of the line
+        for (double x = Rules.HighJumpZoneBest; x > -4; x -= 0.1)
+            Assert.True(Rules.HighJumpTakeoffFactor(x - 0.1) <= Rules.HighJumpTakeoffFactor(x) + 1e-9, $"x={x}");
+    }
+
+    [Fact]
+    public void TheBestAngleIsAroundSeventyFiveDegrees()
+    {
+        double best = 0, bestLift = 0;
+        for (double a = 30; a <= 90; a += 1)
+        {
+            double lift = Rules.HighJumpVerticalSpeed(9, a);
+            if (lift > bestLift) { bestLift = lift; best = a; }
+        }
+        Assert.InRange(best, 70, 80);
+        // a mid-paced run at the best angle clears the opening heights with something to spare, but not forever
+        double peak = Rules.HighJumpPeak(8.3, best, Rules.HighJumpZoneBest);
+        Assert.True(Rules.HighJumpClears(peak, 2.30));
+        Assert.True(Rules.HighJumpClears(peak, 2.34));
+        Assert.False(Rules.HighJumpClears(peak, 2.50));
     }
 }

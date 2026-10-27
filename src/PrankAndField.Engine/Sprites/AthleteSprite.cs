@@ -76,7 +76,14 @@ public static class AthleteSprite
             case Pose.Spin:
                 return new BodyPose(30, -25, -30, -25, 92, 0, 88, 0, 15, 2);
             case Pose.Flop:
-                return new BodyPose(-35, -20, -30, -25, 170, -10, 165, -15, -35, 0);
+                {
+                    // Fosbury flop; phase is the flight progress: arched back over the bar first,
+                    // then the legs kick up (pike) so the feet clear it too.
+                    var arch = new BodyPose(-35, -20, -30, -25, 170, -10, 165, -15, -35, 0);
+                    var pike = new BodyPose(70, -30, 60, -25, 120, -20, 110, -20, 10, 0);
+                    double t = Math.Clamp((phase - 0.55) / 0.35, 0, 1);
+                    return BodyPose.Mix(arch, pike, t * t * (3 - 2 * t));
+                }
             case Pose.Celebrate:
                 {
                     double hop = Math.Max(0, Math.Sin(time * 8)) * 2;

@@ -268,16 +268,41 @@ public static class Stadium
         dl.PopClip();
     }
 
-    /// <summary>High-jump apron, uprights, bar and landing mat. The bar plane is at world x = 0.</summary>
+    /// <summary>Pixels a jumper standing on the high-jump mat is drawn above the ground line (false perspective).</summary>
+    public const double HighJumpMatLift = 9;
+
+    /// <summary>
+    /// High-jump apron with the painted take-off zone, both uprights, the bar and the landing mat.
+    /// The bar plane is at world x = 0; the mat is drawn to the right of it in false perspective.
+    /// </summary>
     public static void DrawHighJumpField(DrawList dl, double cameraX, double barHeightM, double barFallAnim, double groundY)
     {
         double top = Layout.FieldTop, h = Layout.FieldBottom - Layout.FieldTop;
         dl.PushClip(0, top, Screen.Width, h);
         dl.FillRect(0, top, Screen.Width, h, Palette.Grass);
-        // curved apron (approach lane)
         double barX = Layout.ToScreenX(0, cameraX);
-        dl.FillRect(0, groundY - 2, Math.Max(0, barX - 2), 6, Palette.Track);
-        dl.FillRect(0, groundY - 2, Math.Max(0, barX - 2), 0.8, Palette.LaneLine);
+        const double apronTop = -3, apronH = 8;
+
+        // apron (approach lane) up to the uprights
+        dl.FillRect(0, groundY + apronTop, Math.Max(0, barX - 1), apronH, Palette.Track);
+        dl.FillRect(0, groundY + apronTop, Math.Max(0, barX - 1), 0.8, Palette.LaneLine);
+        dl.FillRect(0, groundY + apronTop + apronH - 0.8, Math.Max(0, barX - 1), 0.8, Palette.LaneLine);
+        for (double m = Math.Floor(cameraX / 2) * 2; m < 0; m += 2)
+        {
+            double sx = Layout.ToScreenX(m, cameraX);
+            if (sx < -2 || sx > Screen.Width) continue;
+            dl.FillRect(sx, groundY + apronTop + 1, 0.8, 2, Palette.LaneLine);
+        }
+
+        // take-off zone: a pale band with the best spot as a white line
+        double zoneL = Layout.ToScreenX(Rules.HighJumpZoneFar, cameraX);
+        double zoneR = Layout.ToScreenX(Rules.HighJumpZoneNear, cameraX);
+        double bestX = Layout.ToScreenX(Rules.HighJumpZoneBest, cameraX);
+        dl.FillRect(zoneL, groundY + apronTop + 0.8, zoneR - zoneL, apronH - 1.6, Palette.TakeoffZone);
+        dl.FillRect(zoneL, groundY + apronTop + 0.8, 0.8, apronH - 1.6, Palette.LaneLine);
+        dl.FillRect(zoneR - 0.8, groundY + apronTop + 0.8, 0.8, apronH - 1.6, Palette.LaneLine);
+        dl.FillRect(bestX - 0.7, groundY + apronTop + 0.8, 1.4, apronH - 1.6, Palette.White);
+
         // mat
         var mat = new[]
         {
@@ -291,27 +316,44 @@ public static class Stadium
             new Vec2(barX + 48, groundY + 4), new Vec2(barX - 1, groundY + 4),
         };
         dl.FillPolygon(Palette.Mat, matTop);
-        // uprights
+        dl.FillRect(barX - 1, groundY + 4, 49, 1, Palette.Mat.Darker(0.85));
+
+        // uprights on both sides of the mat (the far one slightly shorter for depth)
         double barPx = barHeightM * Layout.PxPerMeterY;
-        dl.FillRect(barX - 1, groundY - barPx - 10, 1.6, barPx + 10, Palette.Upright);
-        dl.FillRect(barX - 1, groundY - 16 - barPx - 10, 1.6, 1, Palette.Upright);
+        double postTop = groundY - barPx - 12;
+        dl.FillRect(barX - 1.2, postTop, 2, groundY - postTop, Palette.Upright);
+        dl.FillRect(barX - 3, groundY - 1, 5.6, 1.4, Palette.UprightBase);
+        dl.FillRect(barX + 42.4, postTop + 2, 1.6, groundY - 13 - (postTop + 2), Palette.Upright.Darker(0.8));
+        // height ticks on the near upright every 10 cm around the bar
+        for (int i = -2; i <= 2; i++)
+        {
+            double ty = groundY - (barHeightM + i * 0.1) * Layout.PxPerMeterY;
+            dl.FillRect(barX + 0.8, ty, i == 0 ? 2.2 : 1.2, 0.6, Palette.Black);
+        }
+
         // bar
+        double barY = groundY - barPx;
         if (barFallAnim <= 0)
         {
-            dl.FillRect(barX - 1, groundY - barPx, 44, 1.4, Palette.Bar);
-            dl.FillRect(barX + 10, groundY - barPx, 6, 1.4, Palette.FlagRed);
-            dl.FillRect(barX + 28, groundY - barPx, 6, 1.4, Palette.FlagRed);
+            dl.FillRect(barX - 1, barY - 0.7, 44, 1.4, Palette.Bar);
+            dl.FillRect(barX + 9, barY - 0.7, 6, 1.4, Palette.FlagRed);
+            dl.FillRect(barX + 27, barY - 0.7, 6, 1.4, Palette.FlagRed);
         }
         else
         {
-            // bar tumbling onto the mat
-            double drop = barFallAnim * barPx;
-            var a = new Vec2(barX + 2, groundY - barPx + drop * 0.6);
-            var b = new Vec2(barX + 40, groundY - barPx + drop);
+            // knocked off: the near end drops first, both ends settle on the mat
+            double g = barFallAnim * barFallAnim;
+            double nearDrop = Math.Min(1, barFallAnim * 1.6);
+            double matNear = groundY - 11, matFar = groundY - 13;
+            var a = new Vec2(barX + 3 + nearDrop * 4, barY + (matNear - barY) * nearDrop * nearDrop);
+            var b = new Vec2(barX + 41 - g * 2, barY + (matFar - barY) * g);
             dl.Line(a, b, 1.4, Palette.Bar);
+            var mid = (a + b) * 0.5;
+            dl.FillCircle(mid.X, mid.Y, 1.1, Palette.FlagRed);
         }
-        // height label on the upright
-        PixelFont.Draw(dl, barX - 4, groundY - barPx - 9, FormatMeters(barHeightM), Palette.White, 0.5, TextAlign.Right);
+
+        // height label beside the far upright, out of the jumper's way
+        PixelFont.Draw(dl, barX + 46, postTop + 1, FormatMeters(barHeightM), Palette.White, 0.5, TextAlign.Left);
         dl.PopClip();
     }
 

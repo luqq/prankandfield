@@ -36,6 +36,9 @@ public static class Palette
     public static readonly Rgba MatDark = Rgba.Hex(0x2840B0);
     public static readonly Rgba Bar = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba Upright = Rgba.Hex(0xE8E8E8);
+    public static readonly Rgba UprightBase = Rgba.Hex(0x505050);
+    /// <summary>Pale band painted on the high-jump apron where the take-off is legal.</summary>
+    public static readonly Rgba TakeoffZone = Rgba.Hex(0xE0A080);
     public static readonly Rgba Hurdle = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba HurdleBar = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba HurdleStripe = Rgba.Hex(0x3050E0);

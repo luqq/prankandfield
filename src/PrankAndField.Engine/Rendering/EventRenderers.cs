@@ -246,22 +246,46 @@ public static class EventRenderers
     {
         var loc = game.Localizer;
         var a = hj.CurrentAthlete;
-        double camera = Layout.CameraFor(a.X, Rules.HighJumpApproachStart - 1, 2.0 - Screen.Width / Layout.PxPerMeterX + 6);
+        // The camera follows the run-up and parks with the bar at about a third of the screen, mat beside it.
+        double camera = Layout.CameraFor(a.X, Rules.HighJumpApproachStart - 1.5, -HighJumpBarScreenX / Layout.PxPerMeterX);
         double ground = Layout.FieldTop + 62;
-        Stadium.DrawHighJumpField(dl, camera, hj.BarHeight, hj.BarFallen ? hj.BarFallAnim : 0, ground);
+        Stadium.DrawHighJumpField(dl, camera, hj.BarHeight, hj.BarFallAnim, ground);
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in hj.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
-        double ay = ground - a.Y * Layout.PxPerMeterY;
-        if (hj.State is HighJumpState.Landed or HighJumpState.Missed) ay = ground - 9; // on the mat
-        AthleteSprite.Draw(dl, ax, ay, a, time);
+        // The mat is drawn in false perspective: whoever lands on it stands a few pixels "up" the mat. The lift
+        // blends in over the second half of the flight so the landing does not pop.
+        double matLift = 0;
+        if (hj.OnMat)
+        {
+            double t = Math.Clamp((hj.FlightProgress - 0.5) / 0.5, 0, 1);
+            matLift = Stadium.HighJumpMatLift * t * t * (3 - 2 * t);
+        }
+        double ay = ground - a.Y * Layout.PxPerMeterY - matLift;
+        if (hj.State == HighJumpState.Airborne)
+        {
+            // Fosbury flop: after the take-off stretch the jumper turns his back to the bar (mirrored sprite)
+            // and rotates head first over it, landing on his shoulders. A few cosmetic pixels of extra lift in
+            // the middle of the flight keep the draped limbs clear of the bar line on a narrow clearance.
+            ay -= 3 * Math.Sin(Math.PI * hj.FlightProgress);
+            var pose = AthleteSprite.PoseFor(a.Pose, a.AnimPhase, time);
+            double facing = hj.FlightProgress < 0.1 ? 1 : -1;
+            AthleteSprite.Draw(dl, ax, ay, pose, AthleteColors.For(a), facing, a.Rotation, a.PlayerIndex + 1);
+        }
+        else
+        {
+            AthleteSprite.Draw(dl, ax, ay, a, time);
+        }
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
         Stadium.DrawWall(dl, loc[hj.Kind.Key()], game.Round);
-        Hud.DrawSpeedBar(dl, game, hj.SpeedReadout(a.PlayerIndex), $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
+        Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm, $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
         if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, hj.Angle);
         DrawFieldBanner(dl, game, hj);
     }
+
+    /// <summary>Screen x where the high-jump bar parks once the camera stops following the run-up.</summary>
+    private const double HighJumpBarScreenX = 118;
 
     private static void DrawFieldBanner(DrawList dl, Game game, FieldEventSimulation sim)
     {
