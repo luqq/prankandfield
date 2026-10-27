@@ -173,21 +173,34 @@ public static class EventRenderers
 
         if (hm.State is HammerState.Ready or HammerState.Spinning or HammerState.Fouled)
         {
-            // heading 0 = right, 90 = towards the camera. Flip the sprite with the spin.
-            double rad = hm.HammerHeading * Math.PI / 180.0;
-            double facing = hm.State == HammerState.Spinning ? (Math.Cos(rad) >= 0 ? 1 : -1) : 1;
-            var colors = AthleteColors.For(a);
-            var pose = AthleteSprite.PoseFor(a.Pose, a.AnimPhase, time);
-            double hx = ax + Math.Cos(rad) * 22;
-            double hy = ground - 8 + Math.Sin(rad) * 7;
-            bool behind = Math.Sin(rad) < 0;
-            var ballColor = hm.State != HammerState.Spinning ? Palette.Hammer
-                : hm.InReleaseArc ? Palette.HammerHot
-                : hm.InPressZone && !hm.Holding ? Palette.HudBlue
-                : Palette.Hammer;
-            if (behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor);
-            AthleteSprite.Draw(dl, ax, ground, pose, colors, facing, 0, a.PlayerIndex + 1);
-            if (!behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor);
+            // The release gate: the ball glows red while it passes over this arc in front of the circle.
+            if (hm.State != HammerState.Fouled) DrawReleaseGate(dl, ax, ground, time);
+
+            // The ball rests on the ground before the spin, rises to hand height over the first half turn and
+            // drops where it was when the attempt is fouled.
+            double lift = hm.State == HammerState.Spinning ? Math.Clamp((hm.HammerHeading - HammerSimulation.StartHeading) / 180.0, 0, 1) : 0;
+            double ballHeight = 1 + (SpinnerSprite.OrbitHeight(hm.HammerHeading) - 1) * lift;
+            var ball = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, ballHeight);
+            var shadow = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, -0.5);
+            bool behind = Math.Sin(hm.HammerHeading * Math.PI / 180.0) < 0;
+            var ballColor = hm.State == HammerState.Spinning && hm.InReleaseArc ? Palette.HammerHot : Palette.Hammer;
+            dl.FillEllipse(shadow.X, shadow.Y, 2.6, 1.0, Palette.Black.WithAlpha(70));
+
+            if (hm.State == HammerState.Fouled)
+            {
+                // the athlete has fallen or is reeling; the hammer lies on the ground where it was
+                DrawHammerBall(dl, ax + 4, ground - 6, ball.X, ball.Y, ballColor);
+                AthleteSprite.Draw(dl, ax, ground, AthleteSprite.PoseFor(a.Pose, a.AnimPhase, time), AthleteColors.For(a), 1, 0, a.PlayerIndex + 1);
+            }
+            else
+            {
+                var colors = AthleteColors.For(a);
+                var hands = SpinnerSprite.HandsAt(ax, ground, hm.HammerHeading);
+                // behind the thrower the wire and the ball pass behind the body
+                if (behind) DrawHammerBall(dl, hands.X, hands.Y, ball.X, ball.Y, ballColor);
+                SpinnerSprite.Draw(dl, ax, ground, hm.HammerHeading, colors, a.PlayerIndex + 1);
+                if (!behind) DrawHammerBall(dl, hands.X, hands.Y, ball.X, ball.Y, ballColor);
+            }
         }
         else
         {
@@ -202,10 +215,23 @@ public static class EventRenderers
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
         Stadium.DrawWall(dl, loc[hm.Kind.Key()], game.Round);
         Hud.DrawSpeedBar(dl, game, hm.SpeedReadout(a.PlayerIndex), $"{loc["hud.spins"]} {hm.SpinsCompleted}");
-        if (hm.ShowAngle && hm.State == HammerState.Spinning) Hud.DrawAngleBox(dl, ax + 40, Layout.FieldBottom - 13, hm.Angle);
         if (hm.State == HammerState.Flight)
             PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
         DrawFieldBanner(dl, game, hm);
+    }
+
+    /// <summary>Red arc on the ground in front of the circle, under the stretch of the orbit where a release is full distance.</summary>
+    private static void DrawReleaseGate(DrawList dl, double ax, double ground, double time)
+    {
+        const int segments = 10;
+        var pts = new Vec2[segments + 1];
+        for (int i = 0; i <= segments; i++)
+        {
+            double deg = -Rules.HammerReleaseArc + i * 2 * Rules.HammerReleaseArc / segments;
+            pts[i] = SpinnerSprite.BallAt(ax, ground, deg, -0.5);
+        }
+        byte alpha = (byte)(150 + 60 * Math.Sin(time * 6));
+        dl.Polyline(1.2, Palette.HammerHot.WithAlpha(alpha), pts);
     }
 
     private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color)

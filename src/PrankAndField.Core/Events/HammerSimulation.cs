@@ -10,15 +10,19 @@ public enum HammerState
 }
 
 /// <summary>
-/// Hammer throw. A RUN press starts the spin; every revolution is faster. Hold the action button to
-/// count the angle, release when the hammer points down the sector. Ten revolutions make the athlete dizzy.
+/// Hammer throw. A RUN press starts the spin, which accelerates continuously: the longer you turn, the farther
+/// the ball goes, but ten revolutions make the athlete dizzy. A single press of the action button releases the
+/// hammer: straight down the sector (the ball glows red) is full distance, anywhere in the front half is legal
+/// but shorter, and a release with the ball behind the thrower is a foul.
 /// </summary>
 public sealed class HammerSimulation : FieldEventSimulation
 {
+    /// <summary>Heading of the ball when the attempt starts: resting behind the thrower.</summary>
+    public const double StartHeading = 180;
+
     private double _flightTime;
     private double _flightDuration;
     private double _foulTimer;
-    private double _holdStartHeading;
 
     public HammerSimulation(int round, IReadOnlyList<Athlete> athletes, Rng rng)
         : base(EventKind.HammerThrow, round, athletes, rng)
@@ -29,26 +33,33 @@ public sealed class HammerSimulation : FieldEventSimulation
 
     public HammerState State { get; private set; }
 
-    /// <summary>Hammer direction in degrees: 0 = towards the sector (right), 90 = towards the camera (down).</summary>
+    /// <summary>
+    /// Hammer direction in degrees: 0 = towards the sector (right), 90 = towards the camera (down).
+    /// Grows without wrapping while spinning; <see cref="WrapDeg"/> gives the offset from straight ahead.
+    /// </summary>
     public double HammerHeading { get; private set; }
-    public int SpinsCompleted { get; private set; }
-    public double SpinSpeed => Rules.HammerSpinSpeed(SpinsCompleted);
-    public bool Holding { get; private set; }
 
-    /// <summary>True when the hammer is in the sweet spot (drawn red in the arcade): full distance.</summary>
+    /// <summary>Turns made since the spin started, including the fraction of the current one (frozen at the release).</summary>
+    public double Revolutions { get; private set; }
+
+    /// <summary>Whole turns completed so far (the HUD counter and the dizzy limit).</summary>
+    public int SpinsCompleted { get; private set; }
+
+    /// <summary>Current spin speed in revolutions per second.</summary>
+    public double SpinSpeed => Rules.HammerSpinSpeed(Revolutions);
+
+    /// <summary>True when the hammer is in the sweet spot (drawn red): full distance.</summary>
     public bool InReleaseArc => Math.Abs(WrapDeg(HammerHeading)) <= Rules.HammerReleaseArc;
 
     /// <summary>True while the ball is anywhere in front of the thrower: a legal, if weaker, release.</summary>
     public bool InFrontHalf => Math.Abs(WrapDeg(HammerHeading)) <= Rules.HammerFoulArc;
 
-    /// <summary>True while the ball passes behind the thrower: the moment to press the throw button (drawn blue).</summary>
-    public bool InPressZone => Math.Abs(WrapDeg(HammerHeading)) >= 180 - Rules.HammerReleaseArc;
-
     public double HammerX { get; private set; }
     public double HammerY { get; private set; }
     public double Distance { get; private set; }
 
-    public override double SpeedReadout(int playerIndex) => SpinSpeed * 400;
+    /// <summary>The SPEED bar fills up as the spin accelerates; it is nearly full at the dizzy limit.</summary>
+    public override double SpeedReadout(int playerIndex) => SpinSpeed * 700;
 
     public override double? FlightHeight => State == HammerState.Flight ? Math.Clamp(HammerY / Math.Max(3, Distance * 0.22), 0, 1) : null;
 
@@ -57,9 +68,9 @@ public sealed class HammerSimulation : FieldEventSimulation
         State = HammerState.Ready;
         ShowAngle = false;
         Angle = 0;
-        HammerHeading = 180;
+        HammerHeading = StartHeading;
         SpinsCompleted = 0;
-        Holding = false;
+        Revolutions = 0;
         HammerX = 0;
         HammerY = 0;
         Distance = 0;
@@ -82,12 +93,13 @@ public sealed class HammerSimulation : FieldEventSimulation
 
             case HammerState.Spinning:
                 {
-                    double prev = HammerHeading;
+                    int before = SpinsCompleted;
                     HammerHeading += SpinSpeed * 360 * dt;
+                    Revolutions = (HammerHeading - StartHeading) / 360.0;
                     a.Rotation = HammerHeading;
-                    if (Math.Floor(prev / 360.0) < Math.Floor(HammerHeading / 360.0))
+                    SpinsCompleted = (int)Math.Floor(Revolutions);
+                    if (SpinsCompleted > before)
                     {
-                        SpinsCompleted++;
                         Cue(AudioCue.SfxSpin);
                         if (SpinsCompleted >= Rules.HammerMaxSpins)
                         {
@@ -98,22 +110,8 @@ public sealed class HammerSimulation : FieldEventSimulation
 
                     if (e.ActionPressed)
                     {
-                        Holding = true;
-                        ShowAngle = true;
-                        Angle = 0;
-                        _holdStartHeading = HammerHeading;
-                    }
-                    if (Holding)
-                    {
-                        // The angle follows the spin, so the timing stays the same whatever the speed:
-                        // half a turn held (ball behind -> ball in front) is 45 degrees.
-                        Angle = Math.Min(90, (HammerHeading - _holdStartHeading) * Rules.HammerAnglePerDegreeTurned);
-                        if (!e.ActionHeld)
-                        {
-                            Holding = false;
-                            if (InFrontHalf) Throw(a);
-                            else WrongDirection(a);
-                        }
+                        if (InFrontHalf) Throw(a);
+                        else WrongDirection(a);
                     }
                 }
                 break;
@@ -150,7 +148,7 @@ public sealed class HammerSimulation : FieldEventSimulation
         _flightTime = 0;
         double luck = Rng.Range(0.97, 1.03);
         double direction = Rules.HammerDirectionFactor(WrapDeg(HammerHeading));
-        Distance = Math.Min(99.99, Rules.HammerDistance(SpinsCompleted, Angle, luck) * direction);
+        Distance = Math.Min(99.99, Rules.HammerDistance(Revolutions, luck) * direction);
         _flightDuration = 1.4 + Distance * 0.02;
         HammerHeading = 0;
         a.Rotation = 0;
@@ -169,6 +167,7 @@ public sealed class HammerSimulation : FieldEventSimulation
     {
         State = HammerState.Fouled;
         _foulTimer = 1.2;
+        a.Rotation = 0;
         a.Pose = Pose.Fall;
         ShowBanner(BannerKind.WrongDirection, 0, a.PlayerIndex, 1.2);
         Cue(AudioCue.SfxWhistle);
@@ -178,6 +177,7 @@ public sealed class HammerSimulation : FieldEventSimulation
     {
         State = HammerState.Fouled;
         _foulTimer = 1.5;
+        a.Rotation = 0;
         a.Pose = Pose.Dizzy;
         ShowBanner(BannerKind.Dizzy, 0, a.PlayerIndex, 1.5);
         Cue(AudioCue.SfxWhistle);

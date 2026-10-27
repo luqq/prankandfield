@@ -197,3 +197,96 @@ public class AthleteSpriteTests
         Assert.True(hand.Y > 10);
     }
 }
+
+public class SpinnerSpriteTests
+{
+    private static (int Commands, List<string> Described, double MinX, double MaxX, double MinY, double MaxY) DrawAt(double heading)
+    {
+        var dl = new DrawList();
+        SpinnerSprite.Draw(dl, 100, 150, heading, AthleteColors.Player1, 1);
+        var arr = dl.ToArray();
+        double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+        void P(double x, double y)
+        {
+            Assert.True(double.IsFinite(x) && double.IsFinite(y));
+            minX = Math.Min(minX, x); maxX = Math.Max(maxX, x); minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+        }
+        int i = 0;
+        while (arr[i] != Op.End)
+        {
+            switch (arr[i])
+            {
+                case Op.SetColor: i += 5; break;
+                case Op.FillRect: P(arr[i + 1], arr[i + 2]); i += 5; break;
+                case Op.FillCircle: P(arr[i + 1], arr[i + 2]); i += 4; break;
+                case Op.Line: P(arr[i + 1], arr[i + 2]); P(arr[i + 3], arr[i + 4]); i += 6; break;
+                case Op.FillPoly: { int n = (int)arr[i + 1]; Assert.True(n >= 3); for (int k = 0; k < n; k++) P(arr[i + 2 + 2 * k], arr[i + 3 + 2 * k]); i += 2 + 2 * n; break; }
+                default: Assert.Fail("unexpected op " + arr[i]); break;
+            }
+        }
+        return (dl.CommandCount, dl.Describe().ToList(), minX, maxX, minY, maxY);
+    }
+
+    private static string Color(Rgba c) => $"color {c.R},{c.G},{c.B},{c.A}";
+
+    [Fact]
+    public void TheThrowerTurnsSmoothlyThroughEveryHeading()
+    {
+        Vec2? lastHands = null;
+        for (double heading = 0; heading <= 720; heading += 2.5)
+        {
+            var (commands, described, minX, maxX, minY, maxY) = DrawAt(heading);
+            Assert.True(commands >= 15, $"heading {heading}: {commands} commands");
+            Assert.Contains(Color(Palette.HairBrown), described);
+            Assert.InRange(minX, 100 - 14, 100); Assert.InRange(maxX, 100, 100 + 14);
+            Assert.InRange(minY, 150 - 30, 150 - 20); Assert.InRange(maxY, 150 - 2, 150 + 4); // feet on the ground, head about 24 px up
+            var hands = SpinnerSprite.HandsAt(100, 150, heading);
+            if (lastHands is { } prev) Assert.True((hands - prev).Length < 0.5, $"the hands move continuously ({heading})");
+            lastHands = hands;
+        }
+    }
+
+    [Theory]
+    [InlineData(0, true)]      // profile, facing the sector
+    [InlineData(45, true)]
+    [InlineData(90, true)]     // facing the camera
+    [InlineData(180, true)]    // profile, facing left
+    [InlineData(270, false)]   // facing away: no face
+    [InlineData(300, false)]
+    public void TheMustacheShowsOnlyWhenTheFaceIsTurnedToTheCamera(double heading, bool visible)
+    {
+        var (_, described, _, _, _, _) = DrawAt(heading);
+        Assert.Equal(visible, described.Contains(Color(Palette.Mustache)));
+    }
+
+    [Fact]
+    public void BothEyesShowFromTheFrontAndOneInProfile()
+    {
+        static int Eyes(double heading)
+        {
+            var dl = new DrawList();
+            SpinnerSprite.Draw(dl, 100, 150, heading, AthleteColors.Player1, 1);
+            // eyes are the only 0.9 x 0.9 black rects
+            return dl.Describe().Count(d => d.StartsWith("rect ") && d.EndsWith(" 0.9x0.9"));
+        }
+        Assert.Equal(1, Eyes(0));
+        Assert.Equal(2, Eyes(90));
+        Assert.Equal(1, Eyes(180));
+        Assert.Equal(0, Eyes(270));
+    }
+
+    [Fact]
+    public void TheOrbitIsLowInFrontAndHighBehindAndTheHandsFollowTheBall()
+    {
+        Assert.True(SpinnerSprite.OrbitHeight(90) < SpinnerSprite.OrbitHeight(0));
+        Assert.True(SpinnerSprite.OrbitHeight(270) > SpinnerSprite.OrbitHeight(0) + 5);
+        Assert.True(SpinnerSprite.OrbitHeight(90) >= 2, "never on the ground while spinning");
+        var front = SpinnerSprite.BallAt(100, 150, 0, SpinnerSprite.OrbitHeight(0));
+        var back = SpinnerSprite.BallAt(100, 150, 180, SpinnerSprite.OrbitHeight(180));
+        Assert.True(front.X > 100 + 15 && back.X < 100 - 15);
+        var hands = SpinnerSprite.HandsAt(100, 150, 0);
+        Assert.True(hands.X > 100 && hands.X < front.X);
+        var hands180 = SpinnerSprite.HandsAt(100, 150, 180);
+        Assert.True(hands180.X < 100 && hands180.X > back.X);
+    }
+}

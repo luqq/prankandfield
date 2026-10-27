@@ -178,7 +178,25 @@ public static class Scenes
             _ => Pose.Run,
         };
         a.AnimPhase = (time * 2) % 1;
-        AthleteSprite.Draw(dl, 36, Layout.FieldTop + 96, a, time);
+        if (game.CurrentEvent == EventKind.HammerThrow)
+        {
+            // a live turn with the hammer, like in the event itself
+            double heading = (time * 240) % 360;
+            double ax = 36, ground = Layout.FieldTop + 96;
+            var ball = SpinnerSprite.BallAt(ax, ground, heading, SpinnerSprite.OrbitHeight(heading), 16);
+            bool behind = Math.Sin(heading * Math.PI / 180.0) < 0;
+            var colors = AthleteColors.For(a);
+            var hands = SpinnerSprite.HandsAt(ax, ground, heading);
+            void Ball()
+            {
+                dl.Line(hands.X, hands.Y, ball.X, ball.Y, 0.8, Palette.Wire);
+                dl.FillCircle(ball.X, ball.Y, 2.4, Palette.Hammer);
+            }
+            if (behind) Ball();
+            SpinnerSprite.Draw(dl, ax, ground, heading, colors, a.PlayerIndex + 1);
+            if (!behind) Ball();
+        }
+        else AthleteSprite.Draw(dl, 36, Layout.FieldTop + 96, a, time);
     }
 
     public static void DrawOutcome(DrawList dl, Game game, double time)

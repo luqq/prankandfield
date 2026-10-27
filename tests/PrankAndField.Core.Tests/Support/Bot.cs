@@ -105,12 +105,8 @@ public sealed class Bot
                 else if (hm.State == HammerState.Spinning)
                 {
                     _pressedRun = false;
-                    if (hm.SpinsCompleted >= 6)
-                    {
-                        // press as the ball passes behind, release when it glows red in front (~45 degrees)
-                        if (!hm.Holding) action = hm.InPressZone;
-                        else action = !(hm.InReleaseArc && hm.Angle >= 30);
-                    }
+                    // one press when the ball glows red straight ahead of the thrower
+                    if (hm.SpinsCompleted >= 6) action = Math.Abs(HammerSimulation.WrapDeg(hm.HammerHeading)) <= 12;
                 }
                 break;
             case HighJumpSimulation hj when hj.CurrentAthlete.PlayerIndex == _player && hj.Phase == AttemptPhase.Active:

@@ -195,9 +195,9 @@ public sealed class GameHost
                     snapshot["sub"] = hm.State.ToString();
                     snapshot["try"] = hm.CurrentTry;
                     snapshot["spins"] = hm.SpinsCompleted;
-                    snapshot["holding"] = hm.Holding;
+                    snapshot["revolutions"] = hm.Revolutions;
+                    snapshot["heading"] = Core.Events.HammerSimulation.WrapDeg(hm.HammerHeading);
                     snapshot["inArc"] = hm.InReleaseArc;
-                    snapshot["pressZone"] = hm.InPressZone;
                     snapshot["inFront"] = hm.InFrontHalf;
                     break;
                 case Core.Events.HighJumpSimulation hj:
