@@ -90,7 +90,7 @@ Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` 
 | Javelin | Run, hold THROW to raise the angle (you may keep tapping RUN), release before the line. Holding RUN in flight carries the javelin up to 20 % farther. A very steep, fast throw hits the bird. | 60.00 m |
 | 110 m hurdles | Run and press JUMP just before each hurdle. | 14.50 s |
 | Hammer | Press RUN once to spin (each turn is faster). Press THROW when the ball turns blue behind you, release when it glows red in front: that half turn is a 45 degree throw. Any release in the front half is legal but shorter off-centre; behind you is a foul. Ten turns make you dizzy. | 73.00 m |
-| High jump | The approach is automatic. Press JUMP near the bar; while held the angle counts down from 80. Tap RUN in the air to lift over the bar. Clear only on the third try after two misses for the mole. | 2.30 m |
+| High jump | Run up with the RUN buttons, press JUMP inside the zone painted before the bar (the white line is best), hold to raise the angle and release at about 75 degrees. Speed, angle and the take-off spot decide the height; inside the zone the apex is always over the bar. The bar rises 4 cm after every clearance and stays after a miss; running into the uprights is a miss too. Clear only on the third try after two misses for the mole. | 2.30 m |
 
 Later rounds raise the standards (`Rules.cs`). Every 100,000 points earns an extra chance. World records are
 credited to the three-letter name you enter at the start of the credit; the game never asks for initials again.

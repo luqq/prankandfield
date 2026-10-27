@@ -205,6 +205,10 @@ public sealed class GameHost
                     snapshot["sub"] = hj.State.ToString();
                     snapshot["try"] = hj.CurrentTry;
                     snapshot["bar"] = hj.BarHeight;
+                    snapshot["barFallen"] = hj.BarFallen;
+                    snapshot["zone"] = new[] { Rules.HighJumpZoneFar, Rules.HighJumpZoneNear };
+                    snapshot["takeoff"] = Math.Round(hj.TakeoffX, 2);
+                    snapshot["peak"] = Math.Round(hj.PeakHeight, 2);
                     break;
             }
         }

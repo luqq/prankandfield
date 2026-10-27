@@ -18,6 +18,7 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | Jugador 2 | Piel morena (`Palette.SkinP2`) | Distinguir a los atletas |
 | Crédito | «Diseñado y desarrollado por Hiryu Soft» con un logo de dragón, pequeño a la derecha | Petición del usuario |
 | Ramas | Todo en `main`; el usuario fusiona los PR a mano | Se probó a aislar el online en `main-online` y luego se decidió unificar |
+| Salto de altura | Rehecho el 27/10: carrera manual con los botones de correr, zona de batida pintada antes del listón (línea blanca = altura máxima), ángulo que sube desde 30 al mantener saltar (óptimo ~75), vértice del salto siempre sobre el listón si se bate dentro de la zona, listón que sube 4 cm tras cada salto válido | La versión anterior era injugable: carrera automática, ángulo que bajaba desde 80 y una ventana de batida de una décima de segundo; además pedía pulsar correr en el aire a 14 pulsaciones por segundo |
 
 ## Historia del online (PRs de `luqq/prankandfield`)
 
