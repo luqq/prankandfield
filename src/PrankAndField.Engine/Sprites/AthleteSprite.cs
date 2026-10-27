@@ -17,11 +17,15 @@ public readonly record struct BodyPose(
     private static double L(double a, double b, double t) => a + (b - a) * t;
 }
 
+/// <summary>Kit of an athlete. <see cref="Accent"/> colours the headband and the shoe stripe (the shorts colour by default).</summary>
 public readonly record struct AthleteColors(Rgba Hair, Rgba Shorts, Rgba Singlet, Rgba Skin)
 {
+    public Rgba Accent { get; init; } = Shorts;
+    public Rgba Shoe { get; init; } = Palette.Shoe;
+
     public static AthleteColors Player1 => new(Palette.HairBrown, Palette.ShortsP1, Palette.Singlet, Palette.Skin);
     public static AthleteColors Player2 => new(Palette.HairBlack, Palette.ShortsP2, Palette.Singlet, Palette.SkinP2);
-    public static AthleteColors Cpu => new(Palette.HairBlack, Palette.ShortsP2, Rgba.Hex(0xF8E0A0), Rgba.Hex(0xC89060));
+    public static AthleteColors Cpu => new(Palette.HairBlack, Palette.ShortsP2, Rgba.Hex(0xF8E0A0), Rgba.Hex(0xC89060)) { Accent = Rgba.Hex(0xE8A020) };
 
     public static AthleteColors For(Athlete a) => a.IsCpu ? Cpu : (a.PlayerIndex == 0 ? Player1 : Player2);
 }
@@ -29,7 +33,8 @@ public readonly record struct AthleteColors(Rgba Hair, Rgba Shorts, Rgba Singlet
 /// <summary>
 /// The mustachioed athlete, built from circles, polygons and thick lines. Local space has the feet at
 /// (0,0) with y pointing up; <see cref="Draw"/> converts to screen space (y down) at the given anchor.
-/// Height is about 24 logical pixels like the arcade sprite.
+/// Height is about 24 logical pixels like the arcade sprite. Every part is drawn over a dark outline
+/// so the figure stays readable on grass, track and sand alike.
 /// </summary>
 public static class AthleteSprite
 {
@@ -42,6 +47,7 @@ public static class AthleteSprite
     private const double Shin = 5.0;
     private const double Upper = 4.4;
     private const double Fore = 4.0;
+    private const double OutlineWidth = 1.3;
 
     public static BodyPose PoseFor(Pose pose, double phase, double time)
     {
@@ -114,6 +120,17 @@ public static class AthleteSprite
         Draw(dl, x, groundY, pose, colors, facing: 1, rotation: athlete.Rotation, number: athlete.PlayerIndex + 1, scale);
     }
 
+    /// <summary>
+    /// Soft shadow on the ground under an athlete (or implement). <paramref name="heightPx"/> is how far above
+    /// the ground the body is: the shadow shrinks and fades as it rises.
+    /// </summary>
+    public static void DrawShadow(DrawList dl, double x, double groundY, double heightPx = 0, double scale = 1)
+    {
+        double k = Math.Clamp(1 - heightPx / 48.0, 0.3, 1);
+        byte alpha = (byte)(Palette.Shadow.A * k);
+        dl.FillEllipse(x + 1.2 * scale, groundY + 0.6 * scale, 5.4 * scale * k, 1.5 * scale * k, Palette.Shadow.WithAlpha(alpha));
+    }
+
     public static void Draw(DrawList dl, double x, double groundY, BodyPose pose, AthleteColors colors, double facing, double rotation, int number, double scale = 1)
     {
         // Local -> screen: screen = anchor + R(rotation) * (facing*lx*scale, -ly*scale)
@@ -140,9 +157,12 @@ public static class AthleteSprite
         double headX = shX + Math.Sin(lean) * (HeadY - ShoulderY);
         double headY = shY + Math.Cos(lean) * (HeadY - ShoulderY);
 
+        var skinFar = colors.Skin.Darker(0.78);
+        var ink = Palette.Outline;
+
         // --- far limbs (shaded) ---
-        DrawLeg(dl, ToScreen, Dir, -0.9, pose.ThighFar, pose.KneeFar, colors.Skin.Darker(0.78), Palette.Shoe.Darker(0.8), scale);
-        DrawArm(dl, ToScreen, Dir, shX - 0.6, shY, pose.ArmFar, pose.ElbowFar, colors.Skin.Darker(0.78), scale);
+        DrawLeg(dl, ToScreen, Dir, -0.9, pose.ThighFar, pose.KneeFar, skinFar, colors.Shoe.Darker(0.8), colors.Accent.Darker(0.8), ink, scale);
+        DrawArm(dl, ToScreen, Dir, shX - 0.6, shY, pose.ArmFar, pose.ElbowFar, skinFar, ink, scale);
 
         // --- torso / singlet ---
         var torso = new[]
@@ -150,28 +170,46 @@ public static class AthleteSprite
             ToScreen(-2.8, HipY - 0.5), ToScreen(2.8, HipY - 0.5),
             ToScreen(shX + 3.0, shY + 0.5), ToScreen(shX - 3.0, shY + 0.5),
         };
+        dl.Outline(OutlineWidth * scale, ink, torso);
         dl.FillPolygon(colors.Singlet, torso);
+        // shaded back half of the singlet and the team stripe down the side
+        var shade = new[]
+        {
+            ToScreen(-2.8, HipY - 0.5), ToScreen(-0.6, HipY - 0.5),
+            ToScreen(shX - 0.4, shY + 0.5), ToScreen(shX - 3.0, shY + 0.5),
+        };
+        dl.FillPolygon(Palette.SingletShade, shade);
+        var stripe = new[]
+        {
+            ToScreen(-2.8, HipY - 0.5), ToScreen(-1.9, HipY - 0.5),
+            ToScreen(shX - 2.1, shY + 0.5), ToScreen(shX - 3.0, shY + 0.5),
+        };
+        dl.FillPolygon(colors.Accent, stripe);
         // shorts
         var shorts = new[]
         {
             ToScreen(-3.0, HipY + 0.4), ToScreen(3.0, HipY + 0.4),
             ToScreen(2.8, HipY - 2.8), ToScreen(-2.8, HipY - 2.8),
         };
+        dl.Outline(OutlineWidth * scale, ink, shorts);
         dl.FillPolygon(colors.Shorts, shorts);
-        // singlet trim and number
-        dl.Line(ToScreen(shX - 2.6, shY - 0.2), ToScreen(shX + 2.6, shY - 0.2), 0.7 * scale, colors.Shorts);
+        dl.FillPolygon(colors.Shorts.Lighter(0.25), [ToScreen(-3.0, HipY + 0.4), ToScreen(3.0, HipY + 0.4), ToScreen(2.9, HipY - 0.6), ToScreen(-2.9, HipY - 0.6)]);
+        // singlet trim and the chest number
+        dl.Line(ToScreen(shX - 2.6, shY - 0.2), ToScreen(shX + 2.6, shY - 0.2), 0.7 * scale, colors.Accent);
         if (number > 0)
         {
-            var c = ToScreen(shX * 0.5 + facing * 0.3, (HipY + shY) / 2 + 0.3);
-            dl.FillRect(c.X - 0.9 * scale, c.Y - 1.2 * scale, 1.8 * scale, 2.4 * scale, colors.Shorts);
+            var c = ToScreen(shX * 0.5 + facing * 0.6, (HipY + shY) / 2 + 0.6);
+            double ns = 0.42 * scale;
+            PixelFont.Draw(dl, c.X, c.Y - PixelFont.GlyphH * ns / 2, number.ToString(), Palette.Number, ns, TextAlign.Center);
         }
 
         // --- near leg ---
-        DrawLeg(dl, ToScreen, Dir, 0.9, pose.ThighNear, pose.KneeNear, colors.Skin, Palette.Shoe, scale);
+        DrawLeg(dl, ToScreen, Dir, 0.9, pose.ThighNear, pose.KneeNear, colors.Skin, colors.Shoe, colors.Accent, ink, scale);
 
         // --- head ---
         var hc = ToScreen(headX, headY);
         double r = HeadR * scale;
+        dl.FillCircle(hc.X, hc.Y, r + OutlineWidth * 0.45 * scale, ink);
         dl.FillCircle(hc.X, hc.Y, r, colors.Skin);
         // hair: cap over the top-back of the head
         var hair = new[]
@@ -181,6 +219,11 @@ public static class AthleteSprite
             ToScreen(headX + 0.8, headY + 1.9), ToScreen(headX - 1.8, headY + 1.3), ToScreen(headX - 2.6, headY + 0.2),
         };
         dl.FillPolygon(colors.Hair, hair);
+        // headband in the team colour
+        dl.Line(ToScreen(headX - 3.3, headY + 1.3), ToScreen(headX + 3.3, headY + 1.3), 1.0 * scale, colors.Accent);
+        // ear
+        var ear = ToScreen(headX - 2.9, headY - 0.1);
+        dl.FillCircle(ear.X, ear.Y, 0.75 * scale, colors.Skin.Darker(0.9));
         // eye
         var eye = ToScreen(headX + 1.7, headY + 0.6);
         dl.FillRect(eye.X - 0.45 * scale, eye.Y - 0.45 * scale, 0.9 * scale, 0.9 * scale, Palette.Black);
@@ -196,31 +239,47 @@ public static class AthleteSprite
         dl.FillCircle(nose.X, nose.Y, 0.7 * scale, colors.Skin.Darker(0.88));
 
         // --- near arm ---
-        DrawArm(dl, ToScreen, Dir, shX + 0.6, shY, pose.ArmNear, pose.ElbowNear, colors.Skin, scale);
+        DrawArm(dl, ToScreen, Dir, shX + 0.6, shY, pose.ArmNear, pose.ElbowNear, colors.Skin, ink, scale);
     }
 
     private static void DrawLeg(DrawList dl, Func<double, double, Vec2> toScreen, Func<double, Vec2> dir, double hipOffset,
-        double thigh, double knee, Rgba skin, Rgba shoe, double scale)
+        double thigh, double knee, Rgba skin, Rgba shoe, Rgba trim, Rgba ink, double scale)
     {
         var hip = new Vec2(hipOffset, HipY);
         var kneeP = hip + dir(thigh) * Thigh;
         var ankle = kneeP + dir(thigh + knee) * Shin;
         var toe = ankle + new Vec2(1.6, 0).Rotate(-(thigh + knee) * 0.5);
-        dl.Line(toScreen(hip.X, hip.Y), toScreen(kneeP.X, kneeP.Y), 2.2 * scale, skin);
-        dl.Line(toScreen(kneeP.X, kneeP.Y), toScreen(ankle.X, ankle.Y), 1.9 * scale, skin);
-        dl.Line(toScreen(ankle.X, ankle.Y), toScreen(toe.X + 0.6, toe.Y), 1.6 * scale, shoe);
+        var sHip = toScreen(hip.X, hip.Y);
+        var sKnee = toScreen(kneeP.X, kneeP.Y);
+        var sAnkle = toScreen(ankle.X, ankle.Y);
+        var sToe = toScreen(toe.X + 0.6, toe.Y);
+        // outline first, then the limb over it
+        dl.Line(sHip, sKnee, (2.2 + OutlineWidth) * scale, ink);
+        dl.Line(sKnee, sAnkle, (1.9 + OutlineWidth) * scale, ink);
+        dl.Line(sAnkle, sToe, (1.6 + OutlineWidth) * scale, ink);
+        dl.Line(sHip, sKnee, 2.2 * scale, skin);
+        dl.Line(sKnee, sAnkle, 1.9 * scale, skin);
+        dl.Line(sAnkle, sToe, 1.6 * scale, shoe);
+        // shoe stripe
+        var mid = new Vec2((sAnkle.X + sToe.X) / 2, (sAnkle.Y + sToe.Y) / 2);
+        dl.Line(sAnkle, mid, 0.7 * scale, trim);
     }
 
     private static void DrawArm(DrawList dl, Func<double, double, Vec2> toScreen, Func<double, Vec2> dir, double sx, double sy,
-        double arm, double elbow, Rgba skin, double scale)
+        double arm, double elbow, Rgba skin, Rgba ink, double scale)
     {
         var sh = new Vec2(sx, sy);
         var el = sh + dir(arm) * Upper;
         var hand = el + dir(arm + elbow) * Fore;
-        dl.Line(toScreen(sh.X, sh.Y), toScreen(el.X, el.Y), 1.7 * scale, skin);
-        dl.Line(toScreen(el.X, el.Y), toScreen(hand.X, hand.Y), 1.5 * scale, skin);
-        var h = toScreen(hand.X, hand.Y);
-        dl.FillCircle(h.X, h.Y, 0.9 * scale, skin);
+        var sSh = toScreen(sh.X, sh.Y);
+        var sEl = toScreen(el.X, el.Y);
+        var sHand = toScreen(hand.X, hand.Y);
+        dl.Line(sSh, sEl, (1.7 + OutlineWidth) * scale, ink);
+        dl.Line(sEl, sHand, (1.5 + OutlineWidth) * scale, ink);
+        dl.FillCircle(sHand.X, sHand.Y, (0.9 + OutlineWidth * 0.5) * scale, ink);
+        dl.Line(sSh, sEl, 1.7 * scale, skin);
+        dl.Line(sEl, sHand, 1.5 * scale, skin);
+        dl.FillCircle(sHand.X, sHand.Y, 0.9 * scale, skin);
     }
 
     /// <summary>Local coordinates of the near hand for the given pose (to attach implements).</summary>

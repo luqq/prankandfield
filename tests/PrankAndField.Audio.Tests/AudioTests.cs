@@ -1,5 +1,6 @@
 using System.Text.Json;
 using PrankAndField.Core;
+using PrankAndField.Engine.Graphics;
 using PrankAndField.Core.Localization;
 using PrankAndField.UI;
 
@@ -153,10 +154,10 @@ public class GameHostTests
         var buf = host.Frame(1.0 / 60, 0, 0);
         Assert.True(buf.Length > 100);
         Assert.Equal(0, buf[^1]);
-        Assert.Contains(100.0, buf); // audio section with the title song
+        Assert.Contains(DrawList.Walk(buf), c => c.Op == Op.AudioSection); // audio section with the title song
         // steady state: no audio section once cues are drained
         var next = host.Frame(1.0 / 60, 0, 0);
-        Assert.DoesNotContain(100.0, next);
+        Assert.DoesNotContain(DrawList.Walk(next), c => c.Op == Op.AudioSection);
     }
 
     [Fact]

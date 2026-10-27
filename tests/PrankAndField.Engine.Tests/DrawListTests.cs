@@ -76,12 +76,50 @@ public class DrawListTests
     }
 
     [Fact]
+    public void GradientGlowAndArcAreEncoded()
+    {
+        var dl = new DrawList();
+        dl.PushOffset(10, 5);
+        dl.FillGradientRect(0, 0, 20, 10, Palette.SkyTop, Palette.SkyHorizon);
+        dl.Glow(3, 4, 6, Palette.Sun);
+        dl.Arc(1, 2, 8, 180, 360, 1.5, Palette.HudCyan);
+        dl.PopOffset();
+        var d = dl.Describe().ToList();
+        Assert.Equal(["gradient 10,5 20x10 v", "glow 13,9 r=6", "color 64,232,232,255", "arc 11,7 r=8 180-360"], d);
+        var arr = dl.ToArray();
+        // the gradient carries both colours and the direction flag; it never touches the current colour
+        Assert.Equal(Op.GradientRect, arr[0]);
+        Assert.Equal([Palette.SkyTop.R, Palette.SkyTop.G, Palette.SkyTop.B, 255], arr[5..9]);
+        Assert.Equal([Palette.SkyHorizon.R, Palette.SkyHorizon.G, Palette.SkyHorizon.B, 255], arr[9..13]);
+        Assert.Equal(0, arr[13]);
+        Assert.Equal(Op.Glow, arr[14]);
+        Assert.Equal(4, dl.CommandCount);
+    }
+
+    [Fact]
+    public void OutlineClosesTheShape()
+    {
+        var dl = new DrawList();
+        dl.Outline(1, Palette.Outline, [new Vec2(0, 0), new Vec2(4, 0), new Vec2(4, 4)]);
+        Assert.Contains("polyline n=4", dl.Describe());
+        var arr = dl.ToArray();
+        int i = 5; // after colour
+        Assert.Equal(Op.Polyline, arr[i]);
+        Assert.Equal((0, 0), (arr[i + 3], arr[i + 4]));
+        Assert.Equal((0, 0), (arr[i + 9], arr[i + 10]));
+    }
+
+    [Fact]
     public void DegenerateShapesAreSkipped()
     {
         var dl = new DrawList();
         dl.FillRect(0, 0, 0, 5, Palette.White);
         dl.FillCircle(0, 0, -1, Palette.White);
         dl.FillPolygon(Palette.White, new Vec2(0, 0), new Vec2(1, 1));
+        dl.FillGradientRect(0, 0, 5, 0, Palette.White, Palette.Black);
+        dl.Glow(0, 0, 0, Palette.White);
+        dl.Glow(0, 0, 5, Palette.White.WithAlpha(0));
+        dl.Arc(0, 0, 5, 10, 10, 1, Palette.White);
         Assert.Equal(0, dl.CommandCount);
     }
 }
@@ -95,6 +133,8 @@ public class PrimitivesTests
         Assert.Equal((0x10, 0x20, 0x30, 255), (c.R, c.G, c.B, c.A));
         Assert.Equal(128, c.WithAlpha(128).A);
         Assert.Equal(8, c.Darker(0.5).R);
+        Assert.Equal(255, c.Lighter(1).G);
+        Assert.Equal(c.A, c.Lighter(0.5).A);
         Assert.Equal(Rgba.Hex(0x808080), Rgba.Lerp(Rgba.Hex(0x000000), Rgba.Hex(0xFFFFFF), 0.5) with { R = 0x80, G = 0x80, B = 0x80 });
     }
 

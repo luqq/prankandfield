@@ -5,25 +5,39 @@ using PrankAndField.Engine.Sprites;
 
 namespace PrankAndField.Engine.Rendering;
 
-/// <summary>Draws the playfield of each event: scenery, athletes, implements, critters and in-field readouts.</summary>
+/// <summary>Draws the playfield of each event: scenery, athletes, implements, critters, particles and in-field readouts.</summary>
 public static class EventRenderers
 {
-    public static void Draw(DrawList dl, Game game, EventSimulation sim, double time)
+    public static void Draw(DrawList dl, Game game, EventSimulation sim, double time, Fx fx)
     {
         switch (sim)
         {
-            case HurdlesSimulation h: DrawRace(dl, game, h, time); break;
-            case RaceSimulation r: DrawRace(dl, game, r, time); break;
-            case LongJumpSimulation lj: DrawLongJump(dl, game, lj, time); break;
-            case JavelinSimulation jv: DrawJavelin(dl, game, jv, time); break;
-            case HammerSimulation hm: DrawHammer(dl, game, hm, time); break;
-            case HighJumpSimulation hj: DrawHighJump(dl, game, hj, time); break;
+            case HurdlesSimulation h: DrawRace(dl, game, h, time, fx); break;
+            case RaceSimulation r: DrawRace(dl, game, r, time, fx); break;
+            case LongJumpSimulation lj: DrawLongJump(dl, game, lj, time, fx); break;
+            case JavelinSimulation jv: DrawJavelin(dl, game, jv, time, fx); break;
+            case HammerSimulation hm: DrawHammer(dl, game, hm, time, fx); break;
+            case HighJumpSimulation hj: DrawHighJump(dl, game, hj, time, fx); break;
+        }
+        fx.DrawScreen(dl);
+    }
+
+    /// <summary>Faint streaks behind a sprinter at full tilt.</summary>
+    private static void DrawSpeedLines(DrawList dl, double ax, double groundY, double speedCm, double time)
+    {
+        if (speedCm < 1000) return;
+        double k = Math.Clamp((speedCm - 1000) / 450.0, 0, 1);
+        for (int i = 0; i < 3; i++)
+        {
+            double y = groundY - 7 - i * 5.5;
+            double len = (6 + i * 2) * k * (0.7 + 0.3 * Math.Sin(time * 25 + i * 2));
+            dl.Line(ax - 7, y, ax - 7 - len, y, 0.8, Palette.White.WithAlpha((byte)(110 * k)));
         }
     }
 
     // ------------------------------------------------------------------ races
 
-    private static void DrawRace(DrawList dl, Game game, RaceSimulation race, double time)
+    private static void DrawRace(DrawList dl, Game game, RaceSimulation race, double time, Fx fx)
     {
         var loc = game.Localizer;
         // lane 2 on top (player 2 / computer), lane 1 below, each scrolling on its own.
@@ -50,14 +64,18 @@ public static class EventRenderers
                 }
             }
             double ax = Layout.ToScreenX(a.X, camera);
-            AthleteSprite.Draw(dl, ax, ground - a.Y * Layout.PxPerMeterY, a, time);
+            double heightPx = a.Y * Layout.PxPerMeterY;
+            AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
+            DrawSpeedLines(dl, ax, ground, a.Runner.SpeedCm, time);
+            AthleteSprite.Draw(dl, ax, ground - heightPx, a, time);
+            fx.Draw(dl, a.PlayerIndex, camera, ground);
             foreach (var c in race.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
             dl.PopClip();
         }
-        if (byIndex.Count == 1) dl.FillRect(0, Layout.StripATop, Screen.Width, Layout.StripHeight, Palette.Grass);
+        if (byIndex.Count == 1) Stadium.DrawGrass(dl, Layout.StripATop, Layout.StripHeight, 0);
         Hud.DrawRaceBand(dl, game, race);
         Stadium.DrawStands(dl, scrollForStands, time);
-        Stadium.DrawWall(dl, loc[race.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc[race.Kind.Key()], game.Round, scrollForStands, time);
 
         // bottom bar: show the human speed
         var human = race.Athletes.FirstOrDefault(a => !a.IsCpu) ?? race.Athletes[0];
@@ -78,14 +96,18 @@ public static class EventRenderers
         foreach (var a in race.Athletes.Where(x => x.Finished && race.Phase >= RacePhase.Results))
         {
             double top = race.Athletes.Count == 1 || a == byIndex[^1] ? Layout.StripBTop : Layout.StripATop;
-            if (a.Disqualified) PixelFont.Draw(dl, Screen.Width / 2, top + 2, loc["banner.foul"], Palette.HudRed, 1, TextAlign.Center);
-            else Hud.DrawTimer(dl, Screen.Width / 2, top + 2, a.FinishTime, a.IsCpu ? Palette.White : Palette.HudYellow, 1, TextAlign.Center);
+            if (a.Disqualified) Hud.ShadowText(dl, Screen.Width / 2, top + 2, loc["banner.foul"], Palette.HudRed, 1, TextAlign.Center);
+            else
+            {
+                dl.FillRect(Screen.Width / 2 - 20, top + 0.5, 40, 10, Palette.HudPanelDark.WithAlpha(170));
+                Hud.DrawTimer(dl, Screen.Width / 2, top + 2, a.FinishTime, a.IsCpu ? Palette.White : Palette.HudYellow, 1, TextAlign.Center);
+            }
         }
     }
 
     // ------------------------------------------------------------------ long jump
 
-    private static void DrawLongJump(DrawList dl, Game game, LongJumpSimulation lj, double time)
+    private static void DrawLongJump(DrawList dl, Game game, LongJumpSimulation lj, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = lj.CurrentAthlete;
@@ -96,18 +118,22 @@ public static class EventRenderers
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in lj.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
-        AthleteSprite.Draw(dl, ax, ground - a.Y * Layout.PxPerMeterY, a, time);
+        double heightPx = a.Y * Layout.PxPerMeterY;
+        AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
+        if (lj.State == JumpState.Approach) DrawSpeedLines(dl, ax, ground, a.Runner.SpeedCm, time);
+        AthleteSprite.Draw(dl, ax, ground - heightPx, a, time);
+        fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[lj.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc[lj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm);
-        if (lj.ShowAngle) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, lj.Angle);
+        if (lj.ShowAngle) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, lj.Angle);
         DrawFieldBanner(dl, game, lj);
     }
 
     // ------------------------------------------------------------------ javelin
 
-    private static void DrawJavelin(DrawList dl, Game game, JavelinSimulation jv, double time)
+    private static void DrawJavelin(DrawList dl, Game game, JavelinSimulation jv, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = jv.CurrentAthlete;
@@ -118,6 +144,8 @@ public static class EventRenderers
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in jv.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
+        AthleteSprite.DrawShadow(dl, ax, ground);
+        if (jv.State == ThrowState.Approach) DrawSpeedLines(dl, ax, ground, a.Runner.SpeedCm, time);
         AthleteSprite.Draw(dl, ax, ground, a, time);
         // the javelin: in hand before release, flying after.
         if (jv.State is ThrowState.Approach or ThrowState.WindUp)
@@ -133,16 +161,18 @@ public static class EventRenderers
             // Flight heights are squashed so a normal throw stays on screen; only bird-high throws leave the top.
             double jx = Layout.ToScreenX(jv.JavelinX, camera);
             double jy = ground - jv.JavelinY * Layout.PxPerMeterY * Layout.FlightSquash;
+            if (jv.State == ThrowState.Flight) dl.FillEllipse(jx, ground + 0.5, 4, 1, Palette.Shadow.WithAlpha(40));
             DrawJavelin(dl, jx, jy, -jv.JavelinAngle, 16);
         }
+        fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[jv.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc[jv.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm);
-        if (jv.ShowAngle && jv.State == ThrowState.WindUp) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, jv.Angle);
+        if (jv.ShowAngle && jv.State == ThrowState.WindUp) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, jv.Angle);
         if (jv.State == ThrowState.Flight)
         {
-            PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(jv.Distance), Palette.White, 1, TextAlign.Right);
+            Hud.ShadowText(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(jv.Distance), Palette.White, 1, TextAlign.Right);
         }
         DrawFieldBanner(dl, game, jv);
     }
@@ -152,6 +182,7 @@ public static class EventRenderers
         var dir = Vec2.FromAngle(angleDeg);
         var tail = new Vec2(cx, cy) - dir * (length * 0.45);
         var tip = new Vec2(cx, cy) + dir * (length * 0.55);
+        dl.Line(tail, tip, 2.0, Palette.Outline.WithAlpha(120));
         dl.Line(tail, tip, 1.1, Palette.Javelin);
         dl.Line(tip - dir * 3, tip, 1.6, Palette.JavelinTip);
         var grip = new Vec2(cx, cy);
@@ -160,7 +191,7 @@ public static class EventRenderers
 
     // ------------------------------------------------------------------ hammer
 
-    private static void DrawHammer(DrawList dl, Game game, HammerSimulation hm, double time)
+    private static void DrawHammer(DrawList dl, Game game, HammerSimulation hm, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = hm.CurrentAthlete;
@@ -185,38 +216,48 @@ public static class EventRenderers
                 : hm.InReleaseArc ? Palette.HammerHot
                 : hm.InPressZone && !hm.Holding ? Palette.HudBlue
                 : Palette.Hammer;
-            if (behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor);
+            AthleteSprite.DrawShadow(dl, ax, ground);
+            if (behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor, ground);
             AthleteSprite.Draw(dl, ax, ground, pose, colors, facing, 0, a.PlayerIndex + 1);
-            if (!behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor);
+            if (!behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor, ground);
         }
         else
         {
+            AthleteSprite.DrawShadow(dl, ax, ground);
             AthleteSprite.Draw(dl, ax, ground, a, time);
             double hx = Layout.ToScreenX(hm.HammerX, camera);
             double hy = ground - hm.HammerY * Layout.PxPerMeterY * Layout.FlightSquash;
+            if (hm.State == HammerState.Flight) dl.FillEllipse(hx, ground + 0.5, 3, 0.9, Palette.Shadow.WithAlpha(45));
+            dl.FillCircle(hx, hy, 3.2, Palette.Outline.WithAlpha(150));
             dl.FillCircle(hx, hy, 2.6, Palette.Hammer);
+            dl.FillCircle(hx - 0.9, hy - 0.9, 0.9, Palette.HammerShine);
             dl.Line(hx, hy, hx - 4, hy - 3, 0.8, Palette.Wire);
         }
+        fx.Draw(dl, 0, camera, ground);
         foreach (var c in hm.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[hm.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc[hm.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, hm.SpeedReadout(a.PlayerIndex), $"{loc["hud.spins"]} {hm.SpinsCompleted}");
-        if (hm.ShowAngle && hm.State == HammerState.Spinning) Hud.DrawAngleBox(dl, ax + 40, Layout.FieldBottom - 13, hm.Angle);
+        if (hm.ShowAngle && hm.State == HammerState.Spinning) Hud.DrawAngleBox(dl, ax + 40, Layout.FieldBottom - 15, hm.Angle);
         if (hm.State == HammerState.Flight)
-            PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
+            Hud.ShadowText(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
         DrawFieldBanner(dl, game, hm);
     }
 
-    private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color)
+    private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color, double groundY)
     {
+        dl.FillEllipse(hx, groundY + 0.5, 3, 0.9, Palette.Shadow.WithAlpha(50));
         dl.Line(handX, handY, hx, hy, 0.8, Palette.Wire);
+        if (color != Palette.Hammer) dl.Glow(hx, hy, 7, color.WithAlpha(120));
+        dl.FillCircle(hx, hy, 3.4, Palette.Outline.WithAlpha(150));
         dl.FillCircle(hx, hy, 2.8, color);
+        dl.FillCircle(hx - 1, hy - 1, 0.9, color.Lighter(0.5));
     }
 
     // ------------------------------------------------------------------ high jump
 
-    private static void DrawHighJump(DrawList dl, Game game, HighJumpSimulation hj, double time)
+    private static void DrawHighJump(DrawList dl, Game game, HighJumpSimulation hj, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = hj.CurrentAthlete;
@@ -226,14 +267,17 @@ public static class EventRenderers
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in hj.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
-        double ay = ground - a.Y * Layout.PxPerMeterY;
+        double heightPx = a.Y * Layout.PxPerMeterY;
+        double ay = ground - heightPx;
         if (hj.State is HighJumpState.Landed or HighJumpState.Missed) ay = ground - 9; // on the mat
+        else AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
         AthleteSprite.Draw(dl, ax, ay, a, time);
+        fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[hj.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc[hj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, hj.SpeedReadout(a.PlayerIndex), $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
-        if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, hj.Angle);
+        if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, hj.Angle);
         DrawFieldBanner(dl, game, hj);
     }
 
@@ -244,9 +288,12 @@ public static class EventRenderers
         if (sim.Banner == BannerKind.Mark)
         {
             double y = Layout.FieldTop + 10;
-            double w = 70, h = 14;
-            dl.FillRect(Screen.Width / 2 - w / 2, y, w, h, Palette.Black.WithAlpha(210));
-            Hud.DrawMark(dl, Screen.Width / 2, y + 3, sim.Kind, sim.BannerValue, loc, Palette.HudYellow, Palette.HudGreen, 1.2, TextAlign.Center);
+            double w = 74, h = 15;
+            dl.FillRect(Screen.Width / 2 - w / 2 - 2, y - 2, w + 4, h + 4, Palette.HudYellow.WithAlpha(40));
+            dl.FillGradientRect(Screen.Width / 2 - w / 2, y, w, h, Palette.HudPanel.WithAlpha(230), Palette.HudPanelDark.WithAlpha(230));
+            dl.FillRect(Screen.Width / 2 - w / 2, y, w, 0.8, Palette.HudYellow);
+            dl.FillRect(Screen.Width / 2 - w / 2, y + h - 0.8, w, 0.8, Palette.HudYellow);
+            Hud.DrawMark(dl, Screen.Width / 2, y + 3.5, sim.Kind, sim.BannerValue, loc, Palette.HudYellow, Palette.HudGreen, 1.2, TextAlign.Center);
             return;
         }
         var color = sim.Banner is BannerKind.Foul or BannerKind.WrongDirection or BannerKind.Dizzy ? Palette.HudRed : Palette.HudYellow;

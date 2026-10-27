@@ -9,6 +9,9 @@ public readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)
 
     public Rgba Darker(double factor = 0.7) => new((byte)(R * factor), (byte)(G * factor), (byte)(B * factor), A);
 
+    /// <summary>Moves the colour towards white: 0 keeps it, 1 is white.</summary>
+    public Rgba Lighter(double amount = 0.3) => Lerp(this, new Rgba(255, 255, 255, A), amount);
+
     public static Rgba Lerp(Rgba a, Rgba b, double t)
     {
         t = Math.Clamp(t, 0, 1);
@@ -61,6 +64,9 @@ public static class Op
     public const double ClipPop = 8;    //
     public const double FillEllipse = 9;// cx cy rx ry
     public const double Polyline = 10;  // width n x1 y1 ... xn yn (stroked, open)
+    public const double GradientRect = 11; // x y w h  r1 g1 b1 a1  r2 g2 b2 a2  horizontal(0/1): linear gradient fill
+    public const double Glow = 12;      // cx cy r  r g b a: radial gradient from the colour at the centre to transparent
+    public const double Arc = 13;       // cx cy r startDeg endDeg width: stroked circular arc (clockwise, screen angles)
     public const double AudioSection = 100; // marks the start of audio events: (kind, a, b) triplets
     public const double End = 0;
 }
