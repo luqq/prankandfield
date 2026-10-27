@@ -14,7 +14,7 @@ projects; the same Razor component runs in a browser (Blazor WebAssembly) and in
 | Project | Role |
 |---|---|
 | `src/PrankAndField.Core` | Game logic only: events, running/ballistics model, rules and qualifying table, scoring, world records (JSON persistence), the credit state machine and the localizer. No rendering, no audio playback. |
-| `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]`, a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache), stadium, HUD and all screens. Backend-agnostic. |
+| `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]` (rects, polygons, circles, ellipses, lines, polylines, text, clips, linear gradients, radial glows and arcs), a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache, outline and shadow), the animated stadium, HUD, all screens and the visual-only particle effects (`Fx`). Backend-agnostic. |
 | `src/PrankAndField.Audio` | Songs (notes + syllables), sound ids, voice lines and the cue mapping. Serialized to the JavaScript synthesizer. |
 | `src/PrankAndField.Net` | Online play: deterministic lockstep session (input delay, checksum exchange), wire messages and the transport abstraction, plus an in-memory link for local play and tests. |
 | `src/PrankAndField.Net.Client` | SignalR client of the relay: creates or joins a room and exposes the match as an `IGameTransport`. |
@@ -80,6 +80,9 @@ dotnet run --project src/PrankAndField.Web
 | Menu up / down | `↑` / `↓` | | D-pad |
 
 Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` (or the run buttons) pick 1 or 2 players.
+
+The **CRT** button in the toolbar adds scanlines and a slight vignette over the canvas; the choice is remembered in
+the browser (`localStorage` key `paf.crt`). It is purely cosmetic and costs nothing in the simulation.
 
 ### Events (round-1 standards match the arcade)
 

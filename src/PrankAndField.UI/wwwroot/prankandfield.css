@@ -120,9 +120,15 @@
 
 /* ---- online ---------------------------------------------------------------- */
 
-.paf-online-btn.paf-on {
+.paf-btn.paf-on {
   background: var(--paf-accent);
   color: var(--paf-bg);
+}
+
+.paf-crt-btn {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .paf-online-panel {
