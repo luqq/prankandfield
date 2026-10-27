@@ -18,6 +18,7 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | Jugador 2 | Piel morena (`Palette.SkinP2`) | Distinguir a los atletas |
 | Crédito | «Diseñado y desarrollado por Hiryu Soft» con un logo de dragón, pequeño a la derecha | Petición del usuario |
 | Ramas | Todo en `main`; el usuario fusiona los PR a mano | Se probó a aislar el online en `main-online` y luego se decidió unificar |
+| Martillo | Giro continuo: la velocidad angular crece sin saltos y el lanzador se dibuja como figura 3D proyectada (`SpinnerSprite`) que gira con la bola; la órbita de la bola es inclinada (baja delante, alta detrás). Lanzamiento con **una sola pulsación**: no hay ángulo que mantener; la distancia sale de las vueltas (fraccionarias) y de lo centrado del lanzamiento (`Rules.HammerDistance`, `HammerDirectionFactor`) | Antes el atleta solo alternaba entre dos encaramientos (cuatro posturas con la bola delante/detrás) y la mecánica de pulsar detrás / soltar delante era difícil de leer. Petición del usuario (27/10) |
 
 ## Historia del online (PRs de `luqq/prankandfield`)
 
