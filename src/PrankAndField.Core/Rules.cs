@@ -92,14 +92,24 @@ public static class Rules
     public const int HammerMaxSpins = 10;
     public const double HammerReleaseArc = 45;         // degrees either side of straight ahead: the ball glows red here (full distance)
     public const double HammerFoulArc = 90;            // beyond this (ball behind the thrower) the release is a foul
-    /// <summary>Launch angle gained per degree of hammer rotation while holding: press behind, release in front = 45 degrees.</summary>
-    public const double HammerAnglePerDegreeTurned = 0.25;
 
-    public static double HammerSpinSpeed(int spinsCompleted) => 0.6 + 0.15 * spinsCompleted; // revolutions per second (1.5 at six turns)
+    /// <summary>
+    /// Spin speed in revolutions per second after the given (fractional) number of turns. It grows continuously
+    /// rather than stepping at every revolution: a short wind-up over the first half turn, then 0.6 plus 0.15 per
+    /// turn (1.5 after six turns, 2.1 at the dizzy limit).
+    /// </summary>
+    public static double HammerSpinSpeed(double revolutions)
+    {
+        double r = Math.Max(0, revolutions);
+        return 0.6 + 0.15 * r - 0.3 * Math.Max(0, 1 - 2 * r);
+    }
 
-    /// <summary>Distance for a release straight down the sector.</summary>
-    public static double HammerDistance(int spinsCompleted, double angleDeg, double luck) =>
-        Math.Max(5.0, (32 + 8.5 * spinsCompleted) * Math.Sin(2 * angleDeg * Math.PI / 180.0) * luck);
+    /// <summary>
+    /// Distance of a release straight down the sector after the given (fractional) number of turns. There is no
+    /// launch angle to set: every turn adds 8.5 m, so five turns reach the round-1 standard and seven the round-4 one.
+    /// </summary>
+    public static double HammerDistance(double revolutions, double luck) =>
+        Math.Max(5.0, (30 + 8.5 * Math.Max(0, revolutions)) * luck);
 
     /// <summary>Penalty for releasing off-centre: 1 straight ahead, about 0.65 at the edge of the front half.</summary>
     public static double HammerDirectionFactor(double headingOffCentreDeg)

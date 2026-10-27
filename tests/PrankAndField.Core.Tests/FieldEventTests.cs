@@ -198,6 +198,22 @@ public class HammerTests
 {
     private static HammerSimulation New(uint seed = 1) => new(1, [new Athlete(0, false, "AAA")], new Rng(seed));
 
+    /// <summary>Starts the spin on the first active tick and presses the action button once when <paramref name="releaseWhen"/> says so.</summary>
+    private static Func<EventSimulation, (InputFrame, InputFrame)> SpinThen(Func<HammerSimulation, bool> releaseWhen)
+    {
+        bool started = false, released = false;
+        return s =>
+        {
+            var hm = (HammerSimulation)s;
+            if (hm.Phase != AttemptPhase.Active) { started = false; released = false; return (InputFrame.None, InputFrame.None); }
+            if (hm.State == HammerState.Ready && !started) { started = true; return (new InputFrame(Run1: true), InputFrame.None); }
+            if (hm.State == HammerState.Spinning && !released && releaseWhen(hm)) { released = true; return (new InputFrame(Action: true), InputFrame.None); }
+            return (InputFrame.None, InputFrame.None);
+        };
+    }
+
+    private static double Off(HammerSimulation hm) => Math.Abs(HammerSimulation.WrapDeg(hm.HammerHeading));
+
     [Fact]
     public void SixSpinsAndAForwardReleaseQualify()
     {
@@ -205,7 +221,7 @@ public class HammerTests
         var bot = new Bot(0);
         SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
         Assert.True(sim.IsFinished);
-        Assert.True(sim.MarkFor(0) is >= 60 and <= 99.99, $"mark {sim.MarkFor(0)}");
+        Assert.True(sim.MarkFor(0) is >= 73 and <= 99.99, $"mark {sim.MarkFor(0)}");
         Assert.True(sim.DidQualify(0));
     }
 
@@ -231,23 +247,37 @@ public class HammerTests
     }
 
     [Fact]
+    public void ASinglePressReleasesTheHammerAtOnce()
+    {
+        var sim = New();
+        int pressTick = -1, flightTick = -1, tick = 0;
+        var script = SpinThen(hm => hm.SpinsCompleted >= 4 && Off(hm) <= 10);
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            tick++;
+            if (((HammerSimulation)s).State == HammerState.Flight && flightTick < 0) flightTick = tick;
+            var inputs = script(s);
+            if (inputs.Item1.Action && pressTick < 0) pressTick = tick;
+            return inputs;
+        });
+        Assert.True(pressTick > 0, "the script pressed");
+        Assert.Equal(pressTick + 1, flightTick); // in flight right after the press: nothing to hold or release
+        Assert.True(sim.AttemptsFor(0)[0].Mark > 60, $"mark {sim.AttemptsFor(0)[0].Mark}");
+    }
+
+    [Fact]
     public void ReleasingBackwardsIsAFoul()
     {
         var sim = New();
-        bool started = false;
+        bool sawBanner = false;
+        var script = SpinThen(hm => hm.SpinsCompleted >= 3 && !hm.InFrontHalf);
         SimulationRunner.RunUntilFinished(sim, s =>
         {
-            var hm = (HammerSimulation)s;
-            if (hm.Phase != AttemptPhase.Active) { started = false; return (InputFrame.None, InputFrame.None); }
-            if (hm.State == HammerState.Ready && !started) { started = true; return (new InputFrame(Run1: true), InputFrame.None); }
-            if (hm.State == HammerState.Spinning && hm.SpinsCompleted >= 3)
-            {
-                bool hold = !hm.Holding || hm.InFrontHalf || hm.Angle < 30; // release only with the ball behind the thrower
-                return (new InputFrame(Action: hold), InputFrame.None);
-            }
-            return (InputFrame.None, InputFrame.None);
+            if (s.Banner == BannerKind.WrongDirection) sawBanner = true;
+            return script(s);
         });
         Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
+        Assert.True(sawBanner);
     }
 
     [Fact]
@@ -264,15 +294,51 @@ public class HammerTests
         });
         Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
         Assert.Equal(Rules.HammerMaxSpins, sim.SpinsCompleted);
+        Assert.Equal(0, sim.CurrentAthlete.Rotation);
     }
 
     [Fact]
-    public void MoreSpinsThrowFarther()
+    public void MoreTurnsThrowFarther()
     {
-        Assert.True(Rules.HammerDistance(9, 45, 1) > Rules.HammerDistance(6, 45, 1));
-        Assert.True(Rules.HammerDistance(6, 45, 1) * Rules.HammerDirectionFactor(30) >= 73, "six spins at 45 degrees released a bit off-centre should reach the round-1 standard");
+        Assert.True(Rules.HammerDistance(9.5, 1) > Rules.HammerDistance(6.5, 1));
+        Assert.True(Rules.HammerDistance(6.5, 0.97) * Rules.HammerDirectionFactor(30) >= 73, "six turns released a bit off-centre should reach the round-1 standard even with bad luck");
+        Assert.True(Rules.HammerDistance(4.5, 1.03) < 73, "four turns are not enough even with good luck");
+        Assert.True(Rules.HammerDistance(7.5, 0.97) >= 85, "seven turns straight ahead reach the round-4 standard");
         Assert.Equal(1, Rules.HammerDirectionFactor(0));
         Assert.True(Rules.HammerDirectionFactor(90) < Rules.HammerDirectionFactor(45));
+    }
+
+    [Fact]
+    public void TheSpinAcceleratesSmoothly()
+    {
+        var sim = New();
+        bool started = false;
+        var steps = new List<double>();
+        double last = double.NaN;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var hm = (HammerSimulation)s;
+            if (hm.CurrentTry == 1 && hm.Phase == AttemptPhase.Active && hm.State == HammerState.Spinning)
+            {
+                if (!double.IsNaN(last)) steps.Add(hm.HammerHeading - last);
+                last = hm.HammerHeading;
+            }
+            else last = double.NaN;
+            if (hm.Phase != AttemptPhase.Active) { started = false; return (InputFrame.None, InputFrame.None); }
+            if (hm.State == HammerState.Ready && !started) { started = true; return (new InputFrame(Run1: true), InputFrame.None); }
+            return (InputFrame.None, InputFrame.None);
+        });
+        Assert.True(steps.Count > 300, "the spin lasts several seconds");
+        for (int i = 1; i < steps.Count; i++)
+        {
+            Assert.True(steps[i] >= steps[i - 1] - 1e-9, $"the spin never slows down (tick {i}: {steps[i - 1]} -> {steps[i]})");
+            Assert.True(steps[i] - steps[i - 1] < 0.2, $"no jump in speed at a revolution (tick {i}: {steps[i - 1]} -> {steps[i]})");
+        }
+        Assert.True(steps[0] < steps[^1] / 2, "it starts slowly and ends up much faster");
+        // one tick at 60 Hz, 0.6 rev/s is 3.6 degrees; the dizzy limit is reached at 2.1 rev/s
+        Assert.InRange(steps[^1], 11, 13);
+        Assert.InRange(Rules.HammerSpinSpeed(0), 0.25, 0.4);
+        Assert.Equal(1.5, Rules.HammerSpinSpeed(6), 6);
     }
 
     [Fact]
@@ -281,21 +347,7 @@ public class HammerTests
         double Throw(bool centred)
         {
             var sim = New();
-            bool started = false;
-            SimulationRunner.RunUntilFinished(sim, s =>
-            {
-                var hm = (HammerSimulation)s;
-                if (hm.Phase != AttemptPhase.Active) { started = false; return (InputFrame.None, InputFrame.None); }
-                if (hm.State == HammerState.Ready && !started) { started = true; return (new InputFrame(Run1: true), InputFrame.None); }
-                if (hm.State == HammerState.Spinning && hm.SpinsCompleted >= 6)
-                {
-                    double off = Math.Abs(HammerSimulation.WrapDeg(hm.HammerHeading));
-                    if (!hm.Holding) return (new InputFrame(Action: hm.InPressZone), InputFrame.None);
-                    bool releaseNow = centred ? off <= 12 : off is >= 60 and <= 88;
-                    return (new InputFrame(Action: !releaseNow), InputFrame.None);
-                }
-                return (InputFrame.None, InputFrame.None);
-            });
+            SimulationRunner.RunUntilFinished(sim, SpinThen(hm => hm.SpinsCompleted >= 6 && (centred ? Off(hm) <= 12 : Off(hm) is >= 60 and <= 88)));
             return sim.AttemptsFor(0)[0].Mark ?? -1;
         }
         double good = Throw(true), sloppy = Throw(false);
@@ -304,27 +356,27 @@ public class HammerTests
     }
 
     [Fact]
-    public void HalfATurnHeldGivesFortyFiveDegrees()
+    public void TheBallGlowsRedOnlyInTheReleaseArcAndTheReadoutGrows()
     {
         var sim = New();
-        bool started = false;
-        double angleAtRelease = -1;
+        double lastReadout = -1;
+        bool sawRed = false, sawDark = false;
+        var script = SpinThen(hm => hm.SpinsCompleted >= 2 && Off(hm) <= 10);
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             var hm = (HammerSimulation)s;
-            if (hm.Phase != AttemptPhase.Active) { started = false; return (InputFrame.None, InputFrame.None); }
-            if (hm.State == HammerState.Ready && !started) { started = true; return (new InputFrame(Run1: true), InputFrame.None); }
-            if (hm.State == HammerState.Spinning && hm.SpinsCompleted >= 4)
+            if (hm.Phase == AttemptPhase.Active && hm.State == HammerState.Spinning)
             {
-                double off = Math.Abs(HammerSimulation.WrapDeg(hm.HammerHeading));
-                if (!hm.Holding) return (new InputFrame(Action: off >= 176), InputFrame.None);
-                bool release = off <= 6;
-                if (release && angleAtRelease < 0) angleAtRelease = hm.Angle;
-                return (new InputFrame(Action: !release), InputFrame.None);
+                Assert.Equal(Off(hm) <= Rules.HammerReleaseArc, hm.InReleaseArc);
+                Assert.Equal(Off(hm) <= Rules.HammerFoulArc, hm.InFrontHalf);
+                if (hm.InReleaseArc) sawRed = true; else sawDark = true;
+                Assert.True(hm.SpeedReadout(0) >= lastReadout, "the SPEED bar never drops while spinning");
+                lastReadout = hm.SpeedReadout(0);
             }
-            return (InputFrame.None, InputFrame.None);
+            else lastReadout = -1;
+            return script(s);
         });
-        Assert.InRange(angleAtRelease, 40, 50);
+        Assert.True(sawRed && sawDark);
     }
 
     [Fact]
