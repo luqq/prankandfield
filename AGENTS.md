@@ -9,7 +9,10 @@ español; el [`README.md`](README.md) (en inglés) describe el juego, los contro
 Homenaje con gráficos vectoriales al *Track & Field* de Konami (1983), hecho en .NET 10. Se juega en el
 navegador (Blazor WebAssembly, publicado en GitHub Pages) y en escritorio (Photino). Desde octubre de 2026
 tiene **multijugador online 1 contra 1**: lockstep determinista por entradas a través de un servidor relay
-SignalR propio.
+SignalR propio. Desde el 27/10/2026 el título ofrece además el modo **Hyper Sports** (la secuela de 1984:
+natación, tiro al plato, potro, tiro con arco, triple salto y halterofilia) con el mismo motor, atletas,
+marcador y tabla de récords; `Game.Mode` (`GameMode`) dice qué modo se juega y cada `EventKind` sabe a cuál
+pertenece. El modo online sigue jugando solo Prank & Field (ver [docs/pendientes.md](docs/pendientes.md)).
 
 - Juego publicado: <https://luqq.github.io/prankandfield/> (rama `main`).
 - Servidor relay: <https://paf.josecardos.com> (`/hub` para SignalR, `/health` para comprobarlo).

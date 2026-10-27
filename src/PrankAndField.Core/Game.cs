@@ -33,8 +33,8 @@ public sealed class EventOutcome
 }
 
 /// <summary>
-/// Top-level state machine of a credit: title, name entry, the six events in rounds of rising
-/// difficulty, medal ceremony and game over. Deterministic given the inputs and the seed.
+/// Top-level state machine of a credit: title, name entry, the six events of the chosen game in rounds of
+/// rising difficulty, medal ceremony and game over. Deterministic given the inputs and the seed.
 /// </summary>
 public sealed class Game
 {
@@ -79,14 +79,30 @@ public sealed class Game
     public Player[] Players { get; } = [new Player(0), new Player(1)];
     public int PlayerCount { get; private set; } = 1;
     public int Round { get; private set; } = 1;
+
+    /// <summary>The game being played: Track &amp; Field (1983) or Hyper Sports (1984). Chosen on the title menu.</summary>
+    public GameMode Mode { get; private set; } = GameMode.TrackAndField;
+
     public EventKind CurrentEvent { get; private set; } = EventKind.Dash100m;
     public EventSimulation? Simulation { get; private set; }
     public IReadOnlyList<EventOutcome> Outcomes { get; private set; } = [];
 
-    /// <summary>Title menu: 0 = 1 player, 1 = 2 players.</summary>
+    /// <summary>Number of entries of the title menu: 1 or 2 players for each of the two games.</summary>
+    public const int MenuItems = 4;
+
+    /// <summary>
+    /// Title menu: 0 = Track &amp; Field 1 player, 1 = Track &amp; Field 2 players, 2 = Hyper Sports 1 player,
+    /// 3 = Hyper Sports 2 players. Up/down (or the run buttons) move through the list.
+    /// </summary>
     public int MenuSelection { get; private set; }
 
-    /// <summary>Hidden practice menu selection (opened with the Konami code on the title).</summary>
+    /// <summary>Player count of the highlighted menu entry.</summary>
+    public int MenuPlayers => MenuSelection % 2 + 1;
+
+    /// <summary>Game of the highlighted menu entry.</summary>
+    public GameMode MenuMode => MenuSelection >= 2 ? GameMode.HyperSports : GameMode.TrackAndField;
+
+    /// <summary>Hidden practice menu selection (opened with the Konami code on the title). Always an event of <see cref="Mode"/>.</summary>
     public EventKind PracticeEvent { get; private set; } = EventKind.Dash100m;
 
     /// <summary>Target chosen on the practice menu: the round whose qualifying marks apply. Kept for the session.</summary>
@@ -170,17 +186,23 @@ public sealed class Game
     private void TickPracticeMenu()
     {
         var e = _edges[0];
-        int count = EventKindExtensions.InOrder.Length;
-        if (e.DownPressed || e.Run2Pressed) { PracticeEvent = (EventKind)(((int)PracticeEvent + 1) % count); Cue(AudioCue.SfxMenuMove); }
-        if (e.UpPressed || e.Run1Pressed) { PracticeEvent = (EventKind)(((int)PracticeEvent + count - 1) % count); Cue(AudioCue.SfxMenuMove); }
+        var events = Mode.Events();
+        int index = Math.Max(0, Array.IndexOf(events, PracticeEvent));
+        if (e.DownPressed || e.Run2Pressed) { PracticeEvent = events[(index + 1) % events.Length]; Cue(AudioCue.SfxMenuMove); }
+        if (e.UpPressed || e.Run1Pressed) { PracticeEvent = events[(index + events.Length - 1) % events.Length]; Cue(AudioCue.SfxMenuMove); }
         if (e.RightPressed) { PracticeRound = Math.Min(Rules.MaxRound, PracticeRound + 1); Cue(AudioCue.SfxMenuMove); }
         if (e.LeftPressed) { PracticeRound = Math.Max(1, PracticeRound - 1); Cue(AudioCue.SfxMenuMove); }
         if (e.BackPressed || e.KonamiPressed) { EnterTitle(); return; }
         if (e.StartPressed || e.ActionPressed)
         {
             Cue(AudioCue.SfxMenuSelect);
-            JumpToEvent(PracticeEvent, PracticeRound, MenuSelection + 1);
+            JumpToEvent(PracticeEvent, PracticeRound, MenuPlayers);
         }
+    }
+
+    private void MoveMenu(int delta)
+    {
+        MenuSelection = (MenuSelection + delta + MenuItems) % MenuItems;
     }
 
     private bool AnyStart() => _edges[0].StartPressed || _edges[1].StartPressed;
@@ -212,22 +234,28 @@ public sealed class Game
             bool typed = _konami.Feed(e0);
             if (typed || e0.KonamiPressed)
             {
-                // Typing the code flips the 1P/2P choice five times (four directions and B): undo the odd one.
-                if (typed) MenuSelection = 1 - MenuSelection;
+                // Typing the code moves the menu cursor: up, up, down, down cancel out and B moves it one down.
+                // Undo that last step so the choice made before the code is kept.
+                if (typed) MoveMenu(-1);
                 PracticeUsed = true;
+                Mode = MenuMode;
+                if (Array.IndexOf(Mode.Events(), PracticeEvent) < 0) PracticeEvent = Mode.FirstEvent();
                 SetState(GameState.PracticeMenu);
                 Cue(AudioCue.SfxMenuSelect);
                 return;
             }
         }
-        if (e0.UpPressed || e0.DownPressed || e0.Run1Pressed || e0.Run2Pressed || e1.UpPressed || e1.DownPressed)
+        bool up = e0.UpPressed || e0.Run1Pressed || e1.UpPressed;
+        bool down = e0.DownPressed || e0.Run2Pressed || e1.DownPressed;
+        if (up || down)
         {
-            MenuSelection = 1 - MenuSelection;
+            MoveMenu(up ? -1 : 1);
             Cue(AudioCue.SfxMenuMove);
         }
         if (e0.StartPressed || e0.ActionPressed || e1.StartPressed)
         {
-            PlayerCount = MenuSelection + 1;
+            Mode = MenuMode;
+            PlayerCount = MenuPlayers;
             if (e1.StartPressed) PlayerCount = 2;
             Cue(AudioCue.SfxMenuSelect);
             BeginGame();
@@ -235,13 +263,14 @@ public sealed class Game
     }
 
     /// <summary>
-    /// Online match: skips the title menu and starts a two-player credit at name entry. Both peers call it
-    /// on the same tick so their simulations stay in lockstep.
+    /// Online match: skips the title menu and starts a two-player credit of <paramref name="mode"/> at name entry.
+    /// Both peers call it on the same tick so their simulations stay in lockstep.
     /// </summary>
-    public void StartOnlineCredit()
+    public void StartOnlineCredit(GameMode mode = GameMode.TrackAndField)
     {
         if (!IsOnline) throw new InvalidOperationException("Only online games skip the title.");
-        MenuSelection = 1;
+        MenuSelection = mode == GameMode.HyperSports ? 3 : 1;
+        Mode = mode;
         PlayerCount = 2;
         BeginGame();
     }
@@ -321,7 +350,7 @@ public sealed class Game
             }
             else
             {
-                EnterEventIntro(EventKind.Dash100m);
+                EnterEventIntro(Mode.FirstEvent());
             }
         }
     }
@@ -358,7 +387,7 @@ public sealed class Game
             Players[seat].Name = slot.Text;
             Cue(AudioCue.SfxMenuSelect);
         }
-        if (_nameSlots[0].Done && _nameSlots[1].Done) EnterEventIntro(EventKind.Dash100m);
+        if (_nameSlots[0].Done && _nameSlots[1].Done) EnterEventIntro(Mode.FirstEvent());
     }
 
     // ------------------------------------------------------------------ events
@@ -376,7 +405,7 @@ public sealed class Game
     {
         var humans = ActivePlayers.ToList();
         var athletes = new List<Athlete>();
-        if (CurrentEvent.IsTimed())
+        if (CurrentEvent.IsSimultaneous())
         {
             foreach (var p in humans) athletes.Add(new Athlete(p.Index, false, p.Name));
             if (athletes.Count == 1)
@@ -405,6 +434,12 @@ public sealed class Game
         EventKind.Hurdles110m => new HurdlesSimulation(round, athletes, rng),
         EventKind.HammerThrow => new HammerSimulation(round, athletes, rng),
         EventKind.HighJump => new HighJumpSimulation(round, athletes, rng),
+        EventKind.Swimming100m => new SwimmingSimulation(round, athletes, rng),
+        EventKind.SkeetShooting => new SkeetSimulation(round, athletes, rng),
+        EventKind.LongHorse => new VaultSimulation(round, athletes, rng),
+        EventKind.Archery => new ArcherySimulation(round, athletes, rng),
+        EventKind.TripleJump => new TripleJumpSimulation(round, athletes, rng),
+        EventKind.Weightlifting => new WeightliftingSimulation(round, athletes, rng),
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -494,7 +529,7 @@ public sealed class Game
             Cue(AudioCue.VoiceGameOver);
             return;
         }
-        if (CurrentEvent == EventKind.HighJump)
+        if (CurrentEvent.IsLastOfGame())
         {
             SetState(GameState.Ceremony);
             Cue(AudioCue.SongCeremony);
@@ -506,19 +541,21 @@ public sealed class Game
     private void NextRound()
     {
         Round = Math.Min(Round + 1, Rules.MaxRound + 10);
-        EnterEventIntro(EventKind.Dash100m);
+        EnterEventIntro(Mode.FirstEvent());
     }
 
     /// <summary>Champion of the current credit (highest score among the players).</summary>
     public Player Leader => Players.Take(PlayerCount).OrderByDescending(p => p.Score).First();
 
     /// <summary>
-    /// Practice / debugging helper: starts a fresh single-player credit directly at the given event and round,
-    /// skipping the title and name entry.
+    /// Practice / debugging helper: starts a fresh credit of the event's game directly at the given event and
+    /// round, skipping the title and name entry.
     /// </summary>
     public void JumpToEvent(EventKind kind, int round = 1, int players = 1)
     {
         PracticeUsed = true;
+        Mode = kind.Mode();
+        PracticeEvent = kind;
         PlayerCount = Math.Clamp(players, 1, 2);
         Rng = new Rng(_seed + (uint)(TotalTime * 1000) + 1);
         for (int i = 0; i < Players.Length; i++)
@@ -541,6 +578,7 @@ public sealed class Game
         h.Add(StateTime);
         h.Add(Rng.State);
         h.Add(Round);
+        h.Add((int)Mode);
         h.Add((int)CurrentEvent);
         h.Add(PlayerCount);
         h.Add(MenuSelection);

@@ -28,9 +28,9 @@ public abstract class RaceSimulation : EventSimulation
             a.Pose = Pose.Crouch;
             if (a.IsCpu)
             {
-                // The computer aims a little under the qualifying mark, never faster than a 9.5 s / 12.5 s pace.
+                // The computer aims a little under the qualifying mark, never faster than the event's best pace.
                 double q = QualifyingMark;
-                double target = Math.Max(kind == EventKind.Dash100m ? 9.6 : 12.6, q * Rng.Range(0.74, 0.88));
+                double target = Math.Max(Rules.CpuBestTime(kind), q * Rng.Range(0.74, 0.88));
                 _cpuTarget[a.PlayerIndex] = target;
             }
         }
@@ -61,6 +61,16 @@ public abstract class RaceSimulation : EventSimulation
     /// <summary>Cpu target speed in cm/s, derived from the target time.</summary>
     protected double CpuTargetSpeed(Athlete a) => Distance / _cpuTarget[a.PlayerIndex] * 100.0 * 1.04;
 
+    /// <summary>How fast the computer builds speed (cm/s per second).</summary>
+    protected virtual double CpuAcceleration => 900;
+
+    /// <summary>Pose while moving under its own power (running; swimming in the pool).</summary>
+    protected virtual Pose MovingPose(Athlete a) => a.Runner.SpeedCm < 100 ? (a.Runner.SpeedCm <= 0 ? Pose.Idle : Pose.Walk) : Pose.Run;
+
+    /// <summary>Pose while slowing down after the finish.</summary>
+    protected virtual Pose CoastingPose(Athlete a) =>
+        a.Runner.SpeedCm <= 0 && !a.Disqualified ? Pose.Celebrate : a.Runner.SpeedCm < 100 ? Pose.Walk : a.Pose;
+
     protected override void TickCore(double dt, ButtonEdges p1, ButtonEdges p2)
     {
         switch (Phase)
@@ -88,9 +98,10 @@ public abstract class RaceSimulation : EventSimulation
                     {
                         Phase = RacePhase.Running;
                         RaceTime = 0;
-                        foreach (var a in Athletes) a.Pose = Pose.Run;
+                        foreach (var a in Athletes) a.Pose = MovingPose(a) == Pose.Idle ? Pose.Run : MovingPose(a);
                         Cue(AudioCue.SfxGun);
                         Cue(AudioCue.VoiceGo);
+                        OnGun();
                     }
                 }
                 break;
@@ -187,7 +198,7 @@ public abstract class RaceSimulation : EventSimulation
         if (!a.Finished && a.LockTimer <= 0)
         {
             double target = CpuTargetSpeed(a) * (1 + 0.04 * Math.Sin(Elapsed * 2.1));
-            double accel = 900 * dt;
+            double accel = CpuAcceleration * dt;
             if (a.Runner.SpeedCm < target) a.Runner.SpeedCm = Math.Min(target, a.Runner.SpeedCm + accel + a.Runner.SpeedCm * Runner.DragPerSecond * dt);
         }
         if (a.LockTimer > 0) a.LockTimer -= dt;
@@ -215,21 +226,22 @@ public abstract class RaceSimulation : EventSimulation
             a.Disqualified = true;
             a.FinishTime = 99.99;
         }
-        if (a.Y <= 0 && a.LockTimer <= 0)
-            a.Pose = a.Runner.SpeedCm < 100 ? (a.Runner.SpeedCm <= 0 ? Pose.Idle : Pose.Walk) : Pose.Run;
+        if (a.Y <= 0 && a.LockTimer <= 0) a.Pose = MovingPose(a);
     }
 
-    private static void Coast(Athlete a, double dt)
+    private void Coast(Athlete a, double dt)
     {
         double before = a.X;
         a.Runner.Integrate(dt);
         a.AdvanceAnim(a.X - before);
-        if (a.Runner.SpeedCm <= 0 && !a.Disqualified) a.Pose = Pose.Celebrate;
-        else if (a.Runner.SpeedCm < 100) a.Pose = Pose.Walk;
+        a.Pose = CoastingPose(a);
     }
 
-    /// <summary>Per-event motion hook (hurdle jumping). <paramref name="e"/> is null for the computer.</summary>
+    /// <summary>Per-event motion hook (hurdle jumping, breathing). <paramref name="e"/> is null for the computer.</summary>
     protected virtual void TickAthleteMotion(Athlete a, ButtonEdges? e, double dt) { }
+
+    /// <summary>Called on the tick of the gun.</summary>
+    protected virtual void OnGun() { }
 
     protected virtual void ResetCourse() { }
 

@@ -76,6 +76,56 @@ public class RendererTests
         Assert.True(maxCommands < 6000, $"frames should stay light, max {maxCommands} commands");
     }
 
+    [Theory]
+    [MemberData(nameof(Cultures))]
+    public void EveryScreenOfAHyperSportsGameRendersValidCommands(string culture)
+    {
+        var game = new Game(new Localizer(culture), seed: 23);
+        var renderer = new GameRenderer();
+        var bot = new Bot(0, 11);
+        // pick HYPER SPORTS / 1 PLAYER on the title
+        for (int i = 0; i < 2; i++) { game.Tick(new InputFrame(Down: true), InputFrame.None); game.Tick(InputFrame.None, InputFrame.None); }
+        Validate(renderer.Render(game).ToArray());
+        var eventsSeen = new HashSet<EventKind>();
+        int frames = 0, maxCommands = 0;
+        GameState last = (GameState)(-1);
+        SimulationRunner.RunUntil(game, g => g.State == GameState.Ceremony, g =>
+        {
+            frames++;
+            bool changed = g.State != last;
+            last = g.State;
+            if (changed || frames % 6 == 0)
+            {
+                maxCommands = Math.Max(maxCommands, Validate(renderer.Render(g).ToArray()));
+                if (g.State == GameState.Event) eventsSeen.Add(g.CurrentEvent);
+            }
+            return (bot.Next(g), InputFrame.None);
+        }, maxSeconds: 1200);
+        Assert.Equal(GameState.Ceremony, game.State);
+        Assert.Equal(GameMode.HyperSports, game.Mode);
+        Validate(renderer.Render(game).ToArray());
+        Assert.Equal(GameMode.HyperSports.Events().ToHashSet(), eventsSeen);
+        Assert.True(maxCommands < 6000, $"frames should stay light, max {maxCommands} commands");
+    }
+
+    [Fact]
+    public void TitleShowsBothModesAndTheirRecords()
+    {
+        var game = new Game();
+        var renderer = new GameRenderer();
+        Validate(renderer.Render(game).ToArray());
+        game.Tick(new InputFrame(Down: true), InputFrame.None);
+        game.Tick(InputFrame.None, InputFrame.None);
+        game.Tick(new InputFrame(Down: true), InputFrame.None);
+        Assert.Equal(GameMode.HyperSports, game.MenuMode);
+        // the ticker walks the six Hyper Sports events over 18 seconds
+        for (int i = 0; i < 18 * 4; i++)
+        {
+            game.Advance(0.25, InputFrame.None, InputFrame.None);
+            Validate(renderer.Render(game).ToArray());
+        }
+    }
+
     [Fact]
     public void GameOverAndRecordEntryRender()
     {
@@ -134,6 +184,13 @@ public class AthleteSpriteTests
     [InlineData(Pose.Flop)]
     [InlineData(Pose.Celebrate)]
     [InlineData(Pose.Dizzy)]
+    [InlineData(Pose.Swim)]
+    [InlineData(Pose.Breathe)]
+    [InlineData(Pose.Aim)]
+    [InlineData(Pose.Handstand)]
+    [InlineData(Pose.Clean)]
+    [InlineData(Pose.Lift)]
+    [InlineData(Pose.Collapse)]
     public void EveryPoseDrawsAMustachioedAthleteNearTheAnchor(Pose pose)
     {
         var athlete = new Athlete(0, false, "AAA") { Pose = pose, AnimPhase = 0.3 };
@@ -186,6 +243,17 @@ public class AthleteSpriteTests
                 Assert.True(p.ElbowNear > 0 && p.ElbowFar > 0, $"{pose} elbows must bend forwards");
             }
         }
+    }
+
+    [Fact]
+    public void SwimmersLieFlatAndWheelTheirArms()
+    {
+        var a = AthleteSprite.PoseFor(Pose.Swim, 0.0, 0);
+        var b = AthleteSprite.PoseFor(Pose.Swim, 0.5, 0);
+        Assert.True(a.Lean > 80 && b.Lean > 80);
+        Assert.True(Math.Abs(a.ArmNear - b.ArmNear) > 150, "the arms turn half a wheel in half a cycle");
+        var hs = AthleteSprite.PoseFor(Pose.Handstand, 0, 0);
+        Assert.True(Math.Abs(hs.ArmNear) > 170 && Math.Abs(hs.ArmFar) > 170, "arms straight up (down, once rotated)");
     }
 
     [Fact]
