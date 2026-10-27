@@ -69,7 +69,8 @@ public sealed class DrawList
     /// </summary>
     public void FillGradientRect(double x, double y, double w, double h, Rgba from, Rgba to, bool horizontal = false)
     {
-        if (w <= 0 || h <= 0) return;
+        // Negated comparisons also reject NaN: canvas gradients throw on non-finite arguments.
+        if (!(w > 0) || !(h > 0) || !double.IsFinite(x + y)) return;
         _buf.Add(Op.GradientRect);
         _buf.Add(x + Offset.X);
         _buf.Add(y + Offset.Y);
@@ -84,7 +85,7 @@ public sealed class DrawList
     /// <summary>Soft radial light: the colour at the centre fading to transparent at radius <paramref name="r"/>.</summary>
     public void Glow(double cx, double cy, double r, Rgba c)
     {
-        if (r <= 0 || c.A == 0) return;
+        if (!(r > 0) || c.A == 0 || !double.IsFinite(cx + cy)) return;
         _buf.Add(Op.Glow);
         _buf.Add(cx + Offset.X);
         _buf.Add(cy + Offset.Y);
@@ -93,10 +94,14 @@ public sealed class DrawList
         CommandCount++;
     }
 
-    /// <summary>Stroked circular arc from <paramref name="startDeg"/> to <paramref name="endDeg"/> (0 = right, 90 = down).</summary>
+    /// <summary>
+    /// Stroked circular arc swept clockwise from the smaller of <paramref name="startDeg"/> and
+    /// <paramref name="endDeg"/> to the larger (0 = right, 90 = down), so the order of the two angles does not matter.
+    /// </summary>
     public void Arc(double cx, double cy, double r, double startDeg, double endDeg, double width, Rgba c)
     {
-        if (r <= 0 || width <= 0 || startDeg == endDeg) return;
+        if (!(r > 0) || !(width > 0) || !(startDeg != endDeg) || !double.IsFinite(cx + cy + startDeg + endDeg)) return;
+        if (startDeg > endDeg) (startDeg, endDeg) = (endDeg, startDeg);
         SetColor(c);
         _buf.Add(Op.Arc);
         _buf.Add(cx + Offset.X);

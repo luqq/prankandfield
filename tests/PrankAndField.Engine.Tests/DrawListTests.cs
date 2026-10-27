@@ -120,7 +120,20 @@ public class DrawListTests
         dl.Glow(0, 0, 0, Palette.White);
         dl.Glow(0, 0, 5, Palette.White.WithAlpha(0));
         dl.Arc(0, 0, 5, 10, 10, 1, Palette.White);
+        // NaN never reaches the painter either (canvas gradients throw on non-finite arguments)
+        dl.FillGradientRect(0, 0, double.NaN, 5, Palette.White, Palette.Black);
+        dl.FillGradientRect(double.NaN, 0, 5, 5, Palette.White, Palette.Black);
+        dl.Glow(0, 0, double.NaN, Palette.White);
+        dl.Arc(0, 0, 5, double.NaN, 10, 1, Palette.White);
         Assert.Equal(0, dl.CommandCount);
+    }
+
+    [Fact]
+    public void ArcAnglesAreSweptFromTheSmallerToTheLarger()
+    {
+        var dl = new DrawList();
+        dl.Arc(10, 10, 5, 30, -30, 1, Palette.White);
+        Assert.Contains("arc 10,10 r=5 -30-30", dl.Describe());
     }
 }
 

@@ -198,7 +198,13 @@ async function loop(ts) {
     state.running = false;
     return;
   }
-  render(buf);
+  try {
+    render(buf);
+  } catch (err) {
+    // A bad frame must not stop the simulation; log the first few and keep going.
+    state.paintErrors = (state.paintErrors || 0) + 1;
+    if (state.paintErrors <= 3) console.error("[paf] paint failed", err);
+  }
   if (state.running) state.raf = requestAnimationFrame(loop);
 }
 

@@ -66,7 +66,7 @@ public static class Op
     public const double Polyline = 10;  // width n x1 y1 ... xn yn (stroked, open)
     public const double GradientRect = 11; // x y w h  r1 g1 b1 a1  r2 g2 b2 a2  horizontal(0/1): linear gradient fill
     public const double Glow = 12;      // cx cy r  r g b a: radial gradient from the colour at the centre to transparent
-    public const double Arc = 13;       // cx cy r startDeg endDeg width: stroked circular arc (clockwise, screen angles)
+    public const double Arc = 13;       // cx cy r startDeg endDeg width: stroked circular arc, clockwise from startDeg (< endDeg), screen angles
     public const double AudioSection = 100; // marks the start of audio events: (kind, a, b) triplets
     public const double End = 0;
 }
