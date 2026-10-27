@@ -204,22 +204,35 @@ public static class EventRenderers
 
         if (hm.State is HammerState.Ready or HammerState.Spinning or HammerState.Fouled)
         {
-            // heading 0 = right, 90 = towards the camera. Flip the sprite with the spin.
-            double rad = hm.HammerHeading * Math.PI / 180.0;
-            double facing = hm.State == HammerState.Spinning ? (Math.Cos(rad) >= 0 ? 1 : -1) : 1;
-            var colors = AthleteColors.For(a);
-            var pose = AthleteSprite.PoseFor(a.Pose, a.AnimPhase, time);
-            double hx = ax + Math.Cos(rad) * 22;
-            double hy = ground - 8 + Math.Sin(rad) * 7;
-            bool behind = Math.Sin(rad) < 0;
-            var ballColor = hm.State != HammerState.Spinning ? Palette.Hammer
-                : hm.InReleaseArc ? Palette.HammerHot
-                : hm.InPressZone && !hm.Holding ? Palette.HudBlue
-                : Palette.Hammer;
+            // The release gate: the ball glows red while it passes over this arc in front of the circle.
+            if (hm.State != HammerState.Fouled) DrawReleaseGate(dl, ax, ground, time);
+
+            // The ball rests on the ground before the spin, rises to hand height over the first half turn and
+            // drops where it was when the attempt is fouled.
+            double lift = hm.State == HammerState.Spinning ? Math.Clamp((hm.HammerHeading - HammerSimulation.StartHeading) / 180.0, 0, 1) : 0;
+            double ballHeight = 1 + (SpinnerSprite.OrbitHeight(hm.HammerHeading) - 1) * lift;
+            var ball = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, ballHeight);
+            var shadow = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, -0.5);
+            bool behind = Math.Sin(hm.HammerHeading * Math.PI / 180.0) < 0;
+            var ballColor = hm.State == HammerState.Spinning && hm.InReleaseArc ? Palette.HammerHot : Palette.Hammer;
             AthleteSprite.DrawShadow(dl, ax, ground);
-            if (behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor, ground);
-            AthleteSprite.Draw(dl, ax, ground, pose, colors, facing, 0, a.PlayerIndex + 1);
-            if (!behind) DrawHammerBall(dl, ax, ground - 10, hx, hy, ballColor, ground);
+            dl.FillEllipse(shadow.X, shadow.Y, 2.6, 1.0, Palette.Shadow.WithAlpha(50));
+
+            if (hm.State == HammerState.Fouled)
+            {
+                // the athlete has fallen or is reeling; the hammer lies on the ground where it was
+                DrawHammerBall(dl, ax + 4, ground - 6, ball.X, ball.Y, ballColor);
+                AthleteSprite.Draw(dl, ax, ground, AthleteSprite.PoseFor(a.Pose, a.AnimPhase, time), AthleteColors.For(a), 1, 0, a.PlayerIndex + 1);
+            }
+            else
+            {
+                var colors = AthleteColors.For(a);
+                var hands = SpinnerSprite.HandsAt(ax, ground, hm.HammerHeading);
+                // behind the thrower the wire and the ball pass behind the body
+                if (behind) DrawHammerBall(dl, hands.X, hands.Y, ball.X, ball.Y, ballColor);
+                SpinnerSprite.Draw(dl, ax, ground, hm.HammerHeading, colors, a.PlayerIndex + 1);
+                if (!behind) DrawHammerBall(dl, hands.X, hands.Y, ball.X, ball.Y, ballColor);
+            }
         }
         else
         {
@@ -239,15 +252,27 @@ public static class EventRenderers
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
         Stadium.DrawWall(dl, loc[hm.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, hm.SpeedReadout(a.PlayerIndex), $"{loc["hud.spins"]} {hm.SpinsCompleted}");
-        if (hm.ShowAngle && hm.State == HammerState.Spinning) Hud.DrawAngleBox(dl, ax + 40, Layout.FieldBottom - 15, hm.Angle);
         if (hm.State == HammerState.Flight)
             Hud.ShadowText(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
         DrawFieldBanner(dl, game, hm);
     }
 
-    private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color, double groundY)
+    /// <summary>Red arc on the ground in front of the circle, under the stretch of the orbit where a release is full distance.</summary>
+    private static void DrawReleaseGate(DrawList dl, double ax, double ground, double time)
     {
-        dl.FillEllipse(hx, groundY + 0.5, 3, 0.9, Palette.Shadow.WithAlpha(50));
+        const int segments = 10;
+        var pts = new Vec2[segments + 1];
+        for (int i = 0; i <= segments; i++)
+        {
+            double deg = -Rules.HammerReleaseArc + i * 2 * Rules.HammerReleaseArc / segments;
+            pts[i] = SpinnerSprite.BallAt(ax, ground, deg, -0.5);
+        }
+        byte alpha = (byte)(150 + 60 * Math.Sin(time * 6));
+        dl.Polyline(1.2, Palette.HammerHot.WithAlpha(alpha), pts);
+    }
+
+    private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color)
+    {
         dl.Line(handX, handY, hx, hy, 0.8, Palette.Wire);
         if (color != Palette.Hammer) dl.Glow(hx, hy, 7, color.WithAlpha(120));
         dl.FillCircle(hx, hy, 3.4, Palette.Outline.WithAlpha(150));
@@ -261,25 +286,49 @@ public static class EventRenderers
     {
         var loc = game.Localizer;
         var a = hj.CurrentAthlete;
-        double camera = Layout.CameraFor(a.X, Rules.HighJumpApproachStart - 1, 2.0 - Screen.Width / Layout.PxPerMeterX + 6);
+        // The camera follows the run-up and parks with the bar at about a third of the screen, mat beside it.
+        double camera = Layout.CameraFor(a.X, Rules.HighJumpApproachStart - 1.5, -HighJumpBarScreenX / Layout.PxPerMeterX);
         double ground = Layout.FieldTop + 62;
-        Stadium.DrawHighJumpField(dl, camera, hj.BarHeight, hj.BarFallen ? hj.BarFallAnim : 0, ground);
+        Stadium.DrawHighJumpField(dl, camera, hj.BarHeight, hj.BarFallAnim, ground);
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in hj.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
+        // The mat is drawn in false perspective: whoever lands on it stands a few pixels "up" the mat. The lift
+        // blends in over the second half of the flight so the landing does not pop.
+        double matLift = 0;
+        if (hj.OnMat)
+        {
+            double t = Math.Clamp((hj.FlightProgress - 0.5) / 0.5, 0, 1);
+            matLift = Stadium.HighJumpMatLift * t * t * (3 - 2 * t);
+        }
         double heightPx = a.Y * Layout.PxPerMeterY;
-        double ay = ground - heightPx;
-        if (hj.State is HighJumpState.Landed or HighJumpState.Missed) ay = ground - 9; // on the mat
-        else AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
-        AthleteSprite.Draw(dl, ax, ay, a, time);
+        double ay = ground - heightPx - matLift;
+        if (!hj.OnMat) AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
+        if (hj.State == HighJumpState.Airborne)
+        {
+            // Fosbury flop: after the take-off stretch the jumper turns his back to the bar (mirrored sprite)
+            // and rotates head first over it, landing on his shoulders. A few cosmetic pixels of extra lift in
+            // the middle of the flight keep the draped limbs clear of the bar line on a narrow clearance.
+            ay -= 3 * Math.Sin(Math.PI * hj.FlightProgress);
+            var pose = AthleteSprite.PoseFor(a.Pose, a.AnimPhase, time);
+            double facing = hj.FlightProgress < 0.1 ? 1 : -1;
+            AthleteSprite.Draw(dl, ax, ay, pose, AthleteColors.For(a), facing, a.Rotation, a.PlayerIndex + 1);
+        }
+        else
+        {
+            AthleteSprite.Draw(dl, ax, ay, a, time);
+        }
         fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
         Stadium.DrawWall(dl, loc[hj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
-        Hud.DrawSpeedBar(dl, game, hj.SpeedReadout(a.PlayerIndex), $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
+        Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm, $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
         if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, hj.Angle);
         DrawFieldBanner(dl, game, hj);
     }
+
+    /// <summary>Screen x where the high-jump bar parks once the camera stops following the run-up.</summary>
+    private const double HighJumpBarScreenX = 118;
 
     private static void DrawFieldBanner(DrawList dl, Game game, FieldEventSimulation sim)
     {

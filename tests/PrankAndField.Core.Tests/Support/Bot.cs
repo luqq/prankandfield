@@ -29,6 +29,12 @@ public sealed class Bot
     /// <summary>Metres before the board / line at which the bot takes off or throws.</summary>
     public double TakeoffMargin { get; set; } = 0.6;
 
+    /// <summary>High jump: where (metres before the bar) the bot plants its foot. Defaults to the white line.</summary>
+    public double HighJumpTakeoffX { get; set; } = Rules.HighJumpZoneBest;
+
+    /// <summary>High jump: the bot lets go of the button once the meter reaches this angle.</summary>
+    public double HighJumpAngle { get; set; } = 75;
+
     /// <summary>Input for the whole game: presses Start on menus, plays the events.</summary>
     public InputFrame Next(Game game)
     {
@@ -99,21 +105,17 @@ public sealed class Bot
                 else if (hm.State == HammerState.Spinning)
                 {
                     _pressedRun = false;
-                    if (hm.SpinsCompleted >= 6)
-                    {
-                        // press as the ball passes behind, release when it glows red in front (~45 degrees)
-                        if (!hm.Holding) action = hm.InPressZone;
-                        else action = !(hm.InReleaseArc && hm.Angle >= 30);
-                    }
+                    // one press when the ball glows red straight ahead of the thrower
+                    if (hm.SpinsCompleted >= 6) action = Math.Abs(HammerSimulation.WrapDeg(hm.HammerHeading)) <= 12;
                 }
                 break;
             case HighJumpSimulation hj when hj.CurrentAthlete.PlayerIndex == _player && hj.Phase == AttemptPhase.Active:
                 if (hj.State == HighJumpState.Approach)
                 {
-                    if (a!.X >= -0.9) { action = true; _holdUntil = sim.Elapsed + 0.2; }
+                    if (a!.X >= HighJumpTakeoffX) action = true;
+                    else run = Tap(dt);
                 }
-                else if (hj.State == HighJumpState.Rising) action = sim.Elapsed < _holdUntil;
-                else if (hj.State == HighJumpState.Airborne) run = Tap(dt, 14);
+                else if (hj.State == HighJumpState.Rising) action = hj.Angle < HighJumpAngle;
                 break;
         }
 

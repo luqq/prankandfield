@@ -92,14 +92,24 @@ public static class Rules
     public const int HammerMaxSpins = 10;
     public const double HammerReleaseArc = 45;         // degrees either side of straight ahead: the ball glows red here (full distance)
     public const double HammerFoulArc = 90;            // beyond this (ball behind the thrower) the release is a foul
-    /// <summary>Launch angle gained per degree of hammer rotation while holding: press behind, release in front = 45 degrees.</summary>
-    public const double HammerAnglePerDegreeTurned = 0.25;
 
-    public static double HammerSpinSpeed(int spinsCompleted) => 0.6 + 0.15 * spinsCompleted; // revolutions per second (1.5 at six turns)
+    /// <summary>
+    /// Spin speed in revolutions per second after the given (fractional) number of turns. It grows continuously
+    /// rather than stepping at every revolution: a short wind-up over the first half turn, then 0.6 plus 0.15 per
+    /// turn (1.5 after six turns, 2.1 at the dizzy limit).
+    /// </summary>
+    public static double HammerSpinSpeed(double revolutions)
+    {
+        double r = Math.Max(0, revolutions);
+        return 0.6 + 0.15 * r - 0.3 * Math.Max(0, 1 - 2 * r);
+    }
 
-    /// <summary>Distance for a release straight down the sector.</summary>
-    public static double HammerDistance(int spinsCompleted, double angleDeg, double luck) =>
-        Math.Max(5.0, (32 + 8.5 * spinsCompleted) * Math.Sin(2 * angleDeg * Math.PI / 180.0) * luck);
+    /// <summary>
+    /// Distance of a release straight down the sector after the given (fractional) number of turns. There is no
+    /// launch angle to set: every turn adds 8.5 m, so five turns reach the round-1 standard and seven the round-4 one.
+    /// </summary>
+    public static double HammerDistance(double revolutions, double luck) =>
+        Math.Max(5.0, (30 + 8.5 * Math.Max(0, revolutions)) * luck);
 
     /// <summary>Penalty for releasing off-centre: 1 straight ahead, about 0.65 at the edge of the front half.</summary>
     public static double HammerDirectionFactor(double headingOffCentreDeg)
@@ -109,20 +119,63 @@ public static class Rules
     }
 
     // --- High jump --------------------------------------------------------------------------
-    public const double HighJumpApproachStart = -14.0;
-    public const double HighJumpApproachSpeed = 650;   // cm/s, set by the computer in the arcade
-    public const double HighJumpTakeoffMin = -2.5;     // metres before the bar
-    public const double HighJumpTakeoffMax = -0.3;
-    public const double HighJumpAngleStart = 80;
-    public const double HighJumpAngleMin = 20;
-    public const double HighJumpAngleRateDown = 60;
-    public const double HighJumpAirTime = 1.0;
-    public const int HighJumpMaxMashes = 14;
-    public const double HighJumpMashHeight = 0.015;
-    public const double HighJumpBarStep = 0.04;
+    // The jumper runs up on his own, takes off inside a zone painted on the apron, holds the button
+    // to set the angle and clears a bar that rises after every valid jump. The bar plane is x = 0.
+    public const double HighJumpApproachStart = -18.0;  // metres before the bar where the run-up starts
+    public const double HighJumpZoneFar = -1.9;         // take-off zone painted on the apron: from here...
+    public const double HighJumpZoneNear = -0.4;        // ...to here (a late take-off past it still counts, with less lift)
+    public const double HighJumpCrashX = -0.15;         // still on the ground here: he runs into the uprights
+    public const double HighJumpZoneBest = -1.15;       // the white line in the middle: full lift
+    public const double HighJumpZonePenalty = 0.06;     // share of the lift lost at the edges of the zone
+    public const double HighJumpEarlyFalloff = 0.5;     // extra share lost per (0.5 m)^2 of take-off before the zone
+    public const double HighJumpAngleStart = 30;        // the meter starts here: nobody takes off flat
+    public const double HighJumpAngleRate = 110;        // degrees per second while holding, like the long jump
+    public const double HighJumpBestAngle = 68;         // centre of the lift curve (with the sine the optimum is ~75)
+    public const double HighJumpAngleTolerance = 55;    // degrees from the best angle at which the lift would be gone
+    public const double HighJumpHipHeight = 1.1;        // body centre above the ground when leaving it
+    public const double HighJumpBodySag = 0.25;         // how far the draped limbs hang under the body centre over the bar
+    public const double HighJumpBarStep = 0.04;         // the bar rises this much after every valid jump
+    public const double HighJumpMinFlight = 0.55;       // seconds: even a hopeless hop takes this long to watch
 
-    public static double HighJumpPeak(double angleDeg, int mashes) =>
-        1.95 + 0.5 * Math.Sin(angleDeg * Math.PI / 180.0) + HighJumpMashHeight * Math.Min(mashes, HighJumpMaxMashes);
+    /// <summary>Take-off speed (m/s) a run-up at <paramref name="runSpeedMps"/> converts into: 8 m/s -> 5.8, 10 m/s -> 6.1.</summary>
+    public static double HighJumpTakeoffSpeed(double runSpeedMps) => 4.6 + 0.145 * runSpeedMps;
 
-    public static double HighJumpTravel(double angleDeg) => 1.2 + 1.6 * Math.Cos(angleDeg * Math.PI / 180.0);
+    /// <summary>Share of the take-off speed that becomes lift at this angle: 1 at the best angle, 0.84 at 90 degrees.</summary>
+    public static double HighJumpEfficiency(double angleDeg)
+    {
+        double d = (angleDeg - HighJumpBestAngle) / HighJumpAngleTolerance;
+        return Math.Max(0.1, 1 - d * d);
+    }
+
+    /// <summary>Lift kept for a take-off at <paramref name="takeoffX"/>: 1 on the line, 0.94 at the edges of the zone, falling fast before it.</summary>
+    public static double HighJumpTakeoffFactor(double takeoffX)
+    {
+        double half = (HighJumpZoneNear - HighJumpZoneFar) / 2;
+        double d = (Math.Max(takeoffX, HighJumpZoneFar) - HighJumpZoneBest) / half;
+        double f = 1 - HighJumpZonePenalty * d * d;
+        if (takeoffX < HighJumpZoneFar)
+        {
+            double early = (HighJumpZoneFar - takeoffX) / 0.5;
+            f -= HighJumpEarlyFalloff * early * early;
+        }
+        return Math.Clamp(f, 0.05, 1);
+    }
+
+    /// <summary>Vertical take-off speed in m/s before the take-off position is accounted for.</summary>
+    public static double HighJumpVerticalSpeed(double runSpeedMps, double angleDeg) =>
+        HighJumpTakeoffSpeed(runSpeedMps) * HighJumpEfficiency(angleDeg) * Math.Sin(angleDeg * Math.PI / 180.0);
+
+    /// <summary>How far the body centre rises above <see cref="HighJumpHipHeight"/>, in metres.</summary>
+    public static double HighJumpRise(double runSpeedMps, double angleDeg, double takeoffX)
+    {
+        double vy = HighJumpVerticalSpeed(runSpeedMps, angleDeg);
+        return vy * vy / (2 * Ballistics.G) * HighJumpTakeoffFactor(takeoffX);
+    }
+
+    /// <summary>Highest point of the body centre for this jump.</summary>
+    public static double HighJumpPeak(double runSpeedMps, double angleDeg, double takeoffX) =>
+        HighJumpHipHeight + HighJumpRise(runSpeedMps, angleDeg, takeoffX);
+
+    /// <summary>The bar stays up when the body centre passes it with <see cref="HighJumpBodySag"/> to spare.</summary>
+    public static bool HighJumpClears(double bodyCentreAtBar, double barHeight) => bodyCentreAtBar - HighJumpBodySag >= barHeight - 1e-9;
 }
