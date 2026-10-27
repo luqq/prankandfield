@@ -219,16 +219,49 @@ public static class Hud
         double top = Layout.BottomTop;
         dl.FillRect(0, top, Screen.Width, Screen.Height - top, Palette.Black);
         PixelFont.Draw(dl, 4, top + 5, loc["hud.speed"], Palette.White, 0.9);
-        int blocks = (int)Math.Round(Math.Clamp(speedCm / 1550.0, 0, 1) * 24);
+        DrawSpeedBlocks(dl, 44, top + 4, 8, speedCm);
+        DrawSpeedReadout(dl, loc, 206, top + 4.5, 1, speedCm);
+        if (extraLabel is not null) PixelFont.Draw(dl, 4, top + 15, extraLabel, Palette.HudOrange, 0.75);
+    }
+
+    /// <summary>
+    /// Bottom bar of a heat run by two human players at once: one row per runner (1UP above 2UP, like the
+    /// scoreboard), each with its own blocks and cm/sec readout, so both players can watch their own rhythm.
+    /// </summary>
+    public static void DrawSpeedBars(DrawList dl, Game game, IReadOnlyList<Athlete> runners)
+    {
+        var loc = game.Localizer;
+        double top = Layout.BottomTop;
+        dl.FillRect(0, top, Screen.Width, Screen.Height - top, Palette.Black);
+        PixelFont.Draw(dl, 4, top + 7.5, loc["hud.speed"], Palette.White, 0.9);
+        for (int i = 0; i < runners.Count && i < 2; i++)
+        {
+            var a = runners[i];
+            double y = top + 2 + i * 10;
+            var color = a.PlayerIndex == 0 ? Palette.HudCyan : Palette.HudPink;
+            PixelFont.Draw(dl, 42, y + 0.75, loc.Format("hud.player", a.PlayerIndex + 1), color, 0.75);
+            DrawSpeedBlocks(dl, 60, y, 7, a.Runner.SpeedCm);
+            DrawSpeedReadout(dl, loc, 219, y + 0.5, 0.9, a.Runner.SpeedCm);
+        }
+    }
+
+    /// <summary>The 24 blocks of the arcade bar (16 yellow, then 8 blue) lit up to the speed; the bar is full at 1550 cm/s.</summary>
+    private static void DrawSpeedBlocks(DrawList dl, double x, double y, double h, double speedCm)
+    {
+        int lit = (int)Math.Round(Math.Clamp(speedCm / 1550.0, 0, 1) * 24);
         for (int i = 0; i < 24; i++)
         {
-            var c = i < blocks ? (i < 16 ? Palette.HudYellow : Palette.HudBlue) : Palette.DarkGrey.Darker(0.5);
-            dl.FillRect(44 + i * 5.5, top + 4, 4.5, 8, c);
+            var c = i < lit ? (i < 16 ? Palette.HudYellow : Palette.HudBlue) : Palette.DarkGrey.Darker(0.5);
+            dl.FillRect(x + i * 5.5, y, 4.5, h, c);
         }
+    }
+
+    /// <summary>"0000" right-aligned at <paramref name="right"/> followed by the small CM/SEC unit.</summary>
+    private static void DrawSpeedReadout(DrawList dl, Localizer loc, double right, double y, double size, double speedCm)
+    {
         string speed = ((int)Math.Round(speedCm)).ToString("0000", CultureInfo.InvariantCulture);
-        PixelFont.Draw(dl, 206, top + 4.5, speed, Palette.White, 1, TextAlign.Right);
-        PixelFont.Draw(dl, 208, top + 6, loc["hud.cmsec"], Palette.HudYellow, 0.6);
-        if (extraLabel is not null) PixelFont.Draw(dl, 4, top + 15, extraLabel, Palette.HudOrange, 0.75);
+        PixelFont.Draw(dl, right, y, speed, Palette.White, size, TextAlign.Right);
+        PixelFont.Draw(dl, right + 2, y + 1.5 * size, loc["hud.cmsec"], Palette.HudYellow, 0.6 * size);
     }
 
     public static void DrawAngleBox(DrawList dl, double cx, double y, double angle)

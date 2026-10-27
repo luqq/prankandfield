@@ -10,7 +10,7 @@ namespace PrankAndField.Engine.Tests;
 public class RendererTests
 {
     /// <summary>Walks the buffer and checks every opcode is known and every coordinate finite and on a sane range.</summary>
-    private static int Validate(double[] buf)
+    internal static int Validate(double[] buf)
     {
         int i = 0, commands = 0;
         void Coord(double v)
