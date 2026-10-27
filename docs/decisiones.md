@@ -36,8 +36,9 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #9 | 25/10 | Konami Code para el modo práctica y bloqueo del online tras usarlo; piel morena del J2 |
 | #10 | 25/10 | Longitud: caer antes de la arena (`Rules.LongJumpPitStart` = 1 m tras la tabla) es nulo. Jabalina: el atleta se planta al pulsar lanzar y la marca se mide desde la línea de nulo |
 | #12 | 27/10 | Martillo: giro continuo con el lanzador en 3D proyectado (`SpinnerSprite`), órbita inclinada y arco rojo de lanzamiento; se suelta con una sola pulsación, sin ángulo |
+| #13 | 27/10 | Salto de altura rehecho: carrera manual, zona de batida pintada antes del listón, ángulo que sube al mantener saltar y listón que sube 4 cm tras cada salto válido |
 
-Todos están fusionados en `main` (comprobado el 26/10/2026; `main` = `acc72b4`).
+Todos están fusionados en `main` salvo el #13, abierto el 27/10 (comprobado el 27/10/2026).
 
 ## Ramas y repos retirados
 
