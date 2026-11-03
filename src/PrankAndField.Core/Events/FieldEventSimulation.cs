@@ -186,4 +186,28 @@ public abstract class FieldEventSimulation : EventSimulation
         a.AdvanceAnim(a.X - before);
         a.Pose = a.Runner.SpeedCm <= 0 ? Pose.Idle : (a.Runner.SpeedCm < 100 ? Pose.Walk : Pose.Run);
     }
+
+    /// <summary>
+    /// Puts the athlete on an automatic run-up (high jump, long horse): the runner is locked, so from here
+    /// on the RUN buttons add nothing and there is no drag; <see cref="AutoRunStep"/> sets the speed.
+    /// </summary>
+    protected static void StartAutoRun(Athlete a)
+    {
+        a.Runner.Locked = true;
+        a.Runner.SpeedCm = 0;
+        a.Pose = Pose.Run;
+    }
+
+    /// <summary>
+    /// One step of an automatic run-up: the speed ramps up to <paramref name="cruiseCm"/> and stays there
+    /// whatever the player does with the buttons, as in the original arcades.
+    /// </summary>
+    protected static void AutoRunStep(Athlete a, double dt, double cruiseCm)
+    {
+        double before = a.X;
+        a.Runner.SpeedCm = Math.Min(cruiseCm, a.Runner.SpeedCm + Rules.AutoRunAcceleration * dt);
+        a.Runner.Integrate(dt);
+        a.AdvanceAnim(a.X - before);
+        a.Pose = Pose.Run;
+    }
 }

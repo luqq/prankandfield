@@ -2,7 +2,8 @@ namespace PrankAndField.Core.Events;
 
 public enum VaultState
 {
-    Approach,
+    Ready,       // on the mark: one press of a RUN button starts the run-up
+    Approach,    // automatic run-up at a fixed speed
     PreFlight,   // from the springboard to the hands on the horse
     OnHorse,     // handstand on the horse: press to push off
     Flight,      // tap RUN to twist, press at the end to stick the landing
@@ -11,8 +12,9 @@ public enum VaultState
 }
 
 /// <summary>
-/// Long horse (vault). Run up, press at the springboard, press again on the horse to push off, alternate
-/// RUN in the air for twists and press just before landing to stick it. Judges score out of 10.
+/// Long horse (vault). One press of a RUN button starts a run-up at a fixed speed, as in the 1984 arcade;
+/// press at the springboard, press again on the horse to push off, alternate RUN in the air for twists and
+/// press just before landing to stick it. Judges score out of 10.
 /// </summary>
 public sealed class VaultSimulation : FieldEventSimulation
 {
@@ -62,7 +64,7 @@ public sealed class VaultSimulation : FieldEventSimulation
 
     protected override void BeginAttempt(Athlete a)
     {
-        State = VaultState.Approach;
+        State = VaultState.Ready;
         ShowAngle = false;
         Angle = 0;
         BoardQuality = 0;
@@ -80,14 +82,23 @@ public sealed class VaultSimulation : FieldEventSimulation
     {
         switch (State)
         {
+            case VaultState.Ready:
+                // Nothing moves until a RUN button is pressed; JUMP on the mark is ignored.
+                if (e.AnyRunPressed)
+                {
+                    State = VaultState.Approach;
+                    StartAutoRun(a);
+                }
+                break;
+
             case VaultState.Approach:
-                RunStep(a, e, dt);
+                AutoRunStep(a, dt, Rules.VaultRunSpeed);
                 if (e.ActionPressed && a.Runner.SpeedCm > 0)
                 {
                     double gap = BoardX - a.X;
-                    if (gap > Rules.VaultBoardZone || a.Runner.SpeedCm < 300)
+                    if (gap > Rules.VaultBoardZone)
                     {
-                        Foul(a); // jumped far too early (or barely moving): lands short of the horse
+                        Foul(a); // jumped far too early: lands short of the horse
                     }
                     else if (gap < -0.15)
                     {

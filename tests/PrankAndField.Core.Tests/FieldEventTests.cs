@@ -532,9 +532,72 @@ public class HighJumpTests
 {
     private static HighJumpSimulation New(uint seed = 1, int round = 1) => new(round, [new Athlete(0, false, "AAA")], new Rng(seed));
 
-    /// <summary>Runs up at the bot's rhythm and presses JUMP once the athlete passes <paramref name="takeoffX"/>, holding to <paramref name="angle"/>.</summary>
-    private static Bot Jumper(double tapsPerSecond = 9, double takeoffX = Rules.HighJumpZoneBest, double angle = 75) =>
-        new(0, tapsPerSecond) { HighJumpTakeoffX = takeoffX, HighJumpAngle = angle };
+    /// <summary>Starts the automatic run-up with one RUN press and presses JUMP once the athlete passes <paramref name="takeoffX"/>, holding to <paramref name="angle"/>.</summary>
+    private static Bot Jumper(double takeoffX = Rules.HighJumpZoneBest, double angle = 75) =>
+        new(0) { HighJumpTakeoffX = takeoffX, HighJumpAngle = angle };
+
+    [Fact]
+    public void OneRunPressStartsARunUpAtTheFixedSpeedAndNothingMovesBeforeIt()
+    {
+        var sim = New();
+        var speeds = new List<double>();
+        double? xAtPress = null;
+        int ticks = 0;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var hj = (HighJumpSimulation)s;
+            if (hj.CurrentTry > 1) return (InputFrame.None, InputFrame.None);
+            if (hj.Phase != AttemptPhase.Active) return (InputFrame.None, InputFrame.None);
+            ticks++;
+            // JUMP on the mark is ignored; after 1.5 s of hammering it, one RUN press
+            if (ticks < 90)
+            {
+                Assert.Equal(HighJumpState.Ready, hj.State);
+                Assert.Equal(Rules.HighJumpApproachStart, hj.CurrentAthlete.X);
+                return (new InputFrame(Action: ticks % 2 == 0), InputFrame.None);
+            }
+            if (ticks == 90) { xAtPress = hj.CurrentAthlete.X; return (new InputFrame(Run2: true), InputFrame.None); }
+            if (hj.State == HighJumpState.Approach) speeds.Add(hj.CurrentAthlete.Runner.SpeedCm);
+            return (InputFrame.None, InputFrame.None);
+        });
+        Assert.Equal(Rules.HighJumpApproachStart, xAtPress);
+        Assert.NotEmpty(speeds);
+        Assert.Equal(Rules.HighJumpRunSpeed, speeds.Max());
+        Assert.True(speeds.Count(v => v == Rules.HighJumpRunSpeed) > speeds.Count / 2, "cruises at the fixed speed for most of the run-up");
+        Assert.True(sim.AttemptsFor(0)[0].Foul, "ran into the uprights without jumping");
+    }
+
+    [Fact]
+    public void TappingTheRunButtonsAddsNothingToTheFixedSpeed()
+    {
+        double PeakWith(Func<int, InputFrame> runInput)
+        {
+            var sim = New();
+            double peak = 0;
+            int ticks = 0;
+            SimulationRunner.RunUntilFinished(sim, s =>
+            {
+                var hj = (HighJumpSimulation)s;
+                if (hj.CurrentTry > 1 || hj.Phase != AttemptPhase.Active) return (InputFrame.None, InputFrame.None);
+                ticks++;
+                if (hj.State == HighJumpState.Airborne) peak = Math.Max(peak, hj.PeakHeight);
+                if (hj.State == HighJumpState.Ready) return (new InputFrame(Run1: true), InputFrame.None);
+                if (hj.State == HighJumpState.Approach)
+                {
+                    Assert.True(hj.CurrentAthlete.Runner.SpeedCm <= Rules.HighJumpRunSpeed + 1e-9);
+                    bool jump = hj.CurrentAthlete.X >= Rules.HighJumpZoneBest;
+                    return (runInput(ticks) with { Action = jump }, InputFrame.None);
+                }
+                if (hj.State == HighJumpState.Rising) return (new InputFrame(Action: hj.Angle < 75), InputFrame.None);
+                return (InputFrame.None, InputFrame.None);
+            });
+            Assert.True(peak > 0);
+            return peak;
+        }
+        double quiet = PeakWith(_ => InputFrame.None);
+        double frantic = PeakWith(t => t % 2 == 0 ? new InputFrame(Run1: true) : new InputFrame(Run2: true)); // 30 taps/s
+        Assert.Equal(quiet, frantic, 6);
+    }
 
     [Fact]
     public void AGoodJumpClearsTheBarAndRaisesItForTheNextTry()
@@ -650,16 +713,6 @@ public class HighJumpTests
         Assert.Contains(AudioCue.SfxBarFall, SimulationRunner.DrainCues(sim));
     }
 
-    [Fact]
-    public void AJogIsTooSlowToClearTheOpeningHeight()
-    {
-        var sim = New();
-        var bot = Jumper(tapsPerSecond: 5);
-        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
-        Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
-        Assert.Null(sim.MarkFor(0));
-    }
-
     [Theory]
     [InlineData(45)]  // released too soon: flat and short on lift
     [InlineData(90)]  // held to the end: straight up, the run-up is wasted
@@ -672,23 +725,29 @@ public class HighJumpTests
     }
 
     [Fact]
-    public void AFasterRunUpJumpsHigher()
+    public void PerfectTechniqueClearsTheLastHeightOfTheLastRoundButNotMuchMore()
     {
-        double PeakAt(double taps)
+        // The run-up speed is fixed, so the ceiling of the event is set by Rules alone: the best angle on
+        // the white line must clear 2.48 (third bar of round 4) and must not reach 2.54.
+        double peak = Rules.HighJumpPeak(Rules.HighJumpRunSpeed / 100.0, 75, Rules.HighJumpZoneBest);
+        Assert.True(Rules.HighJumpClears(peak, 2.48), $"peak {peak}");
+        Assert.False(Rules.HighJumpClears(peak, 2.54), $"peak {peak}");
+    }
+
+    [Fact]
+    public void TheHigherTheBarTheNarrowerTheAngleWindow()
+    {
+        int WindowDegrees(double bar)
         {
-            var sim = New();
-            var bot = Jumper(tapsPerSecond: taps);
-            double peak = 0;
-            SimulationRunner.RunUntilFinished(sim, s =>
-            {
-                var hj = (HighJumpSimulation)s;
-                if (hj.CurrentTry == 1 && hj.State == HighJumpState.Airborne) peak = hj.PeakHeight;
-                return (hj.CurrentTry == 1 ? bot.NextForSimulation(s) : InputFrame.None, InputFrame.None);
-            });
-            return peak;
+            int ok = 0;
+            for (int angle = 30; angle <= 90; angle++)
+                if (Rules.HighJumpClears(Rules.HighJumpPeak(Rules.HighJumpRunSpeed / 100.0, angle, Rules.HighJumpZoneBest), bar)) ok++;
+            return ok;
         }
-        double slow = PeakAt(7), fast = PeakAt(11);
-        Assert.True(fast > slow + 0.1, $"{fast} vs {slow}");
+        int opening = WindowDegrees(2.30), middle = WindowDegrees(2.40), top = WindowDegrees(2.48);
+        Assert.InRange(opening, 15, 30);  // about two tenths of a second of holding
+        Assert.True(middle < opening, $"{middle} < {opening}");
+        Assert.InRange(top, 3, 12);       // a late-round third bar wants a precise release
     }
 
     [Fact]
@@ -731,7 +790,7 @@ public class HighJumpTests
     {
         var sim = new HighJumpSimulation(1, [new Athlete(0, false, "AAA"), new Athlete(1, false, "BBB")], new Rng(3));
         var p1 = Jumper();
-        var p2 = new Bot(1, 9) { HighJumpTakeoffX = -2.6 }; // player 2 keeps missing
+        var p2 = new Bot(1) { HighJumpTakeoffX = -2.6 }; // player 2 keeps missing
         double? p2BarDuringP1Second = null;
         SimulationRunner.RunUntilFinished(sim, s =>
         {
