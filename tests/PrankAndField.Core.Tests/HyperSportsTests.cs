@@ -336,6 +336,62 @@ public class VaultTests
     }
 
     [Fact]
+    public void OneRunPressStartsARunUpAtTheFixedSpeedAndNothingMovesBeforeIt()
+    {
+        var sim = New();
+        var speeds = new List<double>();
+        int ticks = 0;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var v = (VaultSimulation)s;
+            if (v.CurrentTry > 1 || v.Phase != AttemptPhase.Active) return (InputFrame.None, InputFrame.None);
+            ticks++;
+            // JUMP on the mark is ignored; after a second of hammering it, one RUN press and nothing else
+            if (ticks < 60)
+            {
+                Assert.Equal(VaultState.Ready, v.State);
+                Assert.Equal(0, v.CurrentAthlete.X);
+                return (new InputFrame(Action: ticks % 2 == 0), InputFrame.None);
+            }
+            if (ticks == 60) return (new InputFrame(Run1: true), InputFrame.None);
+            if (v.State == VaultState.Approach) speeds.Add(v.SpeedReadout(0));
+            return (InputFrame.None, InputFrame.None);
+        });
+        Assert.NotEmpty(speeds);
+        Assert.Equal(Rules.VaultRunSpeed, speeds.Max());
+        Assert.True(speeds.Count(x => x == Rules.VaultRunSpeed) > speeds.Count / 2, "cruises at the fixed speed for most of the run-up");
+        Assert.True(sim.AttemptsFor(0)[0].Foul, "ran into the horse without jumping");
+    }
+
+    [Fact]
+    public void TappingTheRunButtonsAddsNothingToTheFixedSpeed()
+    {
+        double? ScoreWith(Func<int, InputFrame> runInput)
+        {
+            var sim = New();
+            var bot = new Bot(0, 11);
+            int ticks = 0;
+            SimulationRunner.RunUntilFinished(sim, s =>
+            {
+                var v = (VaultSimulation)s;
+                ticks++;
+                var f = bot.NextForSimulation(s);
+                if (v.Phase == AttemptPhase.Active && v.State == VaultState.Approach)
+                {
+                    Assert.True(v.CurrentAthlete.Runner.SpeedCm <= Rules.VaultRunSpeed + 1e-9);
+                    f = runInput(ticks) with { Action = f.Action };
+                }
+                return (f, InputFrame.None);
+            });
+            return sim.MarkFor(0);
+        }
+        double? quiet = ScoreWith(_ => InputFrame.None);
+        double? frantic = ScoreWith(t => t % 2 == 0 ? new InputFrame(Run1: true) : new InputFrame(Run2: true)); // 30 taps/s
+        Assert.NotNull(quiet);
+        Assert.Equal(quiet, frantic);
+    }
+
+    [Fact]
     public void ScoreFormulaRewardsEverything()
     {
         Assert.Equal(10.0, Rules.VaultScore(1, 1, 4, true));
