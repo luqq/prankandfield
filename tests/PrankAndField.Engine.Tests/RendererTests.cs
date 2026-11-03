@@ -9,7 +9,10 @@ namespace PrankAndField.Engine.Tests;
 
 public class RendererTests
 {
-    /// <summary>Walks the buffer and checks every opcode is known and every coordinate finite and on a sane range.</summary>
+    /// <summary>
+    /// Walks the buffer and checks every opcode is known, every coordinate finite and on a sane range, and every
+    /// colour opaque: the 1983 look is flat fills and hard edges, so a translucent colour is a regression.
+    /// </summary>
     internal static int Validate(double[] buf)
     {
         int i = 0, commands = 0;
@@ -25,7 +28,7 @@ public class RendererTests
             commands++;
             switch (op)
             {
-                case Op.SetColor: i += 5; break;
+                case Op.SetColor: Assert.True(buf[i + 4] == 255, $"translucent colour at {i}: the arcade look is flat and opaque"); i += 5; break;
                 case Op.FillRect: Coord(buf[i + 1]); Coord(buf[i + 2]); Coord(buf[i + 3]); Coord(buf[i + 4]); i += 5; break;
                 case Op.FillPoly: { int n = (int)buf[i + 1]; Assert.True(n >= 3); for (int k = 0; k < 2 * n; k++) Coord(buf[i + 2 + k]); i += 2 + 2 * n; break; }
                 case Op.FillCircle: Coord(buf[i + 1]); Coord(buf[i + 2]); Assert.True(buf[i + 3] > 0); i += 4; break;
@@ -224,6 +227,8 @@ public class AthleteSpriteTests
                 case Op.FillCircle: AssertNear(arr[i + 1], arr[i + 2]); i += 4; break;
                 case Op.Line: AssertNear(arr[i + 1], arr[i + 2]); AssertNear(arr[i + 3], arr[i + 4]); i += 6; break;
                 case Op.FillPoly: { int n = (int)arr[i + 1]; for (int k = 0; k < n; k++) AssertNear(arr[i + 2 + 2 * k], arr[i + 3 + 2 * k]); i += 2 + 2 * n; break; }
+                case Op.Polyline: { int n = (int)arr[i + 2]; for (int k = 0; k < n; k++) AssertNear(arr[i + 3 + 2 * k], arr[i + 4 + 2 * k]); i += 3 + 2 * n; break; }
+                case Op.FillEllipse: AssertNear(arr[i + 1], arr[i + 2]); i += 5; break;
                 default: Assert.Fail("unexpected op " + arr[i]); break;
             }
         }

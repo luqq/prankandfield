@@ -14,16 +14,77 @@ public static class Scenes
     /// <summary>Text colour of each player, matching the shorts of their athlete.</summary>
     private static Rgba PlayerColor(int seat) => seat == 0 ? Rgba.Hex(0x6888F8) : Palette.HudRed;
 
+    private static uint Hash(int a, int b)
+    {
+        uint h = (uint)(a * 374761393) ^ (uint)(b * 668265263);
+        h ^= h >> 13;
+        h *= 1274126177;
+        h ^= h >> 16;
+        return h;
+    }
+
+    /// <summary>Evening sky in three flat bands with blinking pixel stars and a low sun, filling the area above the stands.</summary>
+    private static void DrawSky(DrawList dl, double bottom, double time)
+    {
+        double split = bottom * 0.6;
+        dl.FillRect(0, 0, Screen.Width, split, Palette.SkyTop);
+        dl.FillRect(0, split, Screen.Width, bottom - split, Palette.SkyMid);
+        dl.FillRect(0, bottom - 8, Screen.Width, 8, Palette.SkyHorizon);
+        for (int i = 0; i < 46; i++)
+        {
+            uint hsh = Hash(i, 3);
+            double x = hsh % 256;
+            double y = (hsh >> 8) % (uint)Math.Max(1, (int)(split * 0.9));
+            // each star blinks on its own rhythm: lit most of the time, off for a moment
+            if (Math.Sin(time * 2.5 + i * 1.7) > -0.7) dl.FillRect(x, y, 0.9, 0.9, Palette.Star);
+        }
+        // the sun sets between the two menu columns, clear of their text
+        dl.FillCircle(128, bottom - 8, 9, Palette.Sun);
+    }
+
+    /// <summary>Floodlight mast rising above the stands, with its bank of lamps.</summary>
+    private static void DrawMast(DrawList dl, double x, double headY)
+    {
+        dl.Line(x, Layout.StandsTop, x, headY + 2, 1.4, Palette.RoofDark);
+        dl.Line(x - 2.5, Layout.StandsTop, x, headY + 10, 0.6, Palette.RoofDark);
+        dl.Line(x + 2.5, Layout.StandsTop, x, headY + 10, 0.6, Palette.RoofDark);
+        dl.FillRect(x - 7, headY, 14, 3.5, Palette.Roof);
+        for (int k = 0; k < 4; k++) dl.FillRect(x - 6 + k * 3.4, headY + 0.8, 2.4, 2, Palette.Floodlight);
+    }
+
+    /// <summary>Black card with a one-pixel frame, used by every menu and result screen.</summary>
+    private static void DrawCard(DrawList dl, double x, double y, double w, double h, Rgba border)
+    {
+        dl.FillRect(x, y, w, h, Palette.Black);
+        dl.FillRect(x, y, w, 1, border);
+        dl.FillRect(x, y + h - 1, w, 1, border);
+        dl.FillRect(x, y, 1, h, border);
+        dl.FillRect(x + w - 1, y, 1, h, border);
+    }
+
+    /// <summary>Big title lettering with the two-step extruded shadow of the arcade logos.</summary>
+    private static void DrawTitleText(DrawList dl, double cx, double y, string text, double size, Rgba color, Rgba shadow)
+    {
+        // Two shadow copies are enough for the extrusion; every copy costs ~8 rects per character.
+        PixelFont.Draw(dl, cx + 2.2, y + 2.2, text, shadow, size, TextAlign.Center);
+        PixelFont.Draw(dl, cx + 1, y + 1, text, shadow.Lighter(0.25), size, TextAlign.Center);
+        PixelFont.Draw(dl, cx, y, text, color, size, TextAlign.Center);
+    }
+
     public static void DrawTitle(DrawList dl, Game game, double time)
     {
         var loc = game.Localizer;
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
+        DrawSky(dl, Layout.StandsTop, time);
+        DrawMast(dl, 26, 12);
+        DrawMast(dl, 230, 12);
 
         // stadium backdrop at the bottom with two demo runners
         double scroll = time * 120;
         Stadium.DrawStands(dl, scroll, time);
-        Stadium.DrawWall(dl, loc["game.subtitle"], 0);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, 60, Palette.Grass);
+        Stadium.DrawWall(dl, loc, loc["game.subtitle"], 0, scroll, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, 60, scroll / Layout.PxPerMeterX);
+        dl.FillRect(0, Layout.FieldTop + 11.2, Screen.Width, 0.8, Palette.GrassDark);
         dl.FillRect(0, Layout.FieldTop + 12, Screen.Width, 30, Palette.Track);
         dl.FillRect(0, Layout.FieldTop + 12, Screen.Width, 1, Palette.LaneLine);
         dl.FillRect(0, Layout.FieldTop + 41, Screen.Width, 1, Palette.LaneLine);
@@ -35,14 +96,13 @@ public static class Scenes
         DemoP1.Pose = Pose.Run; DemoP1.AnimPhase = (time * 2.2) % 1;
         DemoP2.Pose = Pose.Run; DemoP2.AnimPhase = (time * 2.0 + 0.4) % 1;
         double ground = Layout.FieldTop + 40;
-        AthleteSprite.Draw(dl, 150 + Math.Sin(time * 0.7) * 30, ground, DemoP2, time);
-        AthleteSprite.Draw(dl, 110 + Math.Sin(time * 0.9) * 40, ground, DemoP1, time);
+        double x2 = 150 + Math.Sin(time * 0.7) * 30, x1 = 110 + Math.Sin(time * 0.9) * 40;
+        AthleteSprite.Draw(dl, x2, ground, DemoP2, time);
+        AthleteSprite.Draw(dl, x1, ground, DemoP1, time);
 
-        // big title with drop shadow, in the HUD area
+        // big extruded title in the HUD area
         string title = loc["game.title"];
-        double size = 2.2;
-        PixelFont.Draw(dl, Screen.Width / 2 + 2, 6 + 2, title, Palette.HudRed.Darker(0.5), size, TextAlign.Center);
-        PixelFont.Draw(dl, Screen.Width / 2, 6, title, Palette.HudYellow, size, TextAlign.Center);
+        DrawTitleText(dl, Screen.Width / 2, 6, title, 2.2, Palette.HudYellow, Palette.HudRed.Darker(0.5));
         dl.FillRect(40, 27, Screen.Width - 80, 1, Palette.HudCyan);
         PixelFont.Draw(dl, Screen.Width / 2, 30, loc["game.copyright"], Palette.HudCyan, 0.6, TextAlign.Center);
 
@@ -52,7 +112,7 @@ public static class Scenes
             var mode = col == 0 ? GameMode.TrackAndField : GameMode.HyperSports;
             bool colSel = game.MenuMode == mode;
             double cx = col == 0 ? 68 : 188;
-            PixelFont.Draw(dl, cx, 39, loc[mode.Key()], colSel ? Palette.HudYellow : Palette.Grey, 0.8, TextAlign.Center);
+            Hud.ShadowText(dl, cx, 39, loc[mode.Key()], colSel ? Palette.HudYellow : Palette.Grey, 0.8, TextAlign.Center);
             dl.FillRect(cx - 32, 46, 64, 0.8, colSel ? Palette.HudYellow : Palette.DarkGrey);
             for (int i = 0; i < 2; i++)
             {
@@ -60,14 +120,19 @@ public static class Scenes
                 bool sel = game.MenuSelection == index;
                 string label = loc[i == 0 ? "title.players_1" : "title.players_2"];
                 double ly = 49 + i * 7.5;
-                if (sel) PixelFont.Draw(dl, cx - 30, ly, "→", Palette.HudRed, 0.8);
-                PixelFont.Draw(dl, cx - 20, ly, label, sel ? Palette.White : Palette.Grey, 0.8);
+                if (sel)
+                {
+                    dl.FillRect(cx - 32, ly - 1.5, 64, 8.5, Palette.HudDim);
+                    PixelFont.Draw(dl, cx - 30 + Math.Sin(time * 6) * 1.2, ly, "→", Palette.HudRed, 0.8);
+                }
+                Hud.ShadowText(dl, cx - 20, ly, label, sel ? Palette.White : Palette.Grey, 0.8);
             }
         }
 
         if (Math.Sin(time * 4) > -0.2)
-            PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 48, loc["title.press_start"], Palette.HudYellow, 1.1, TextAlign.Center);
+            Hud.ShadowText(dl, Screen.Width / 2, Layout.FieldTop + 48, loc["title.press_start"], Palette.HudYellow, 1.1, TextAlign.Center);
 
+        dl.FillRect(0, Layout.FieldTop + 60, Screen.Width, Screen.Height - Layout.FieldTop - 60, Palette.Black);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 64, loc["title.controls_p1"], Palette.HudCyan, 0.7, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 72, loc["title.controls_p2"], Palette.HudPink, 0.7, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 84, loc.Format("title.language", loc["lang.name"]), Palette.White, 0.7, TextAlign.Center);
@@ -87,9 +152,9 @@ public static class Scenes
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
         Hud.DrawScoreboard(dl, game, time);
         Stadium.DrawStands(dl, time * 20, time);
-        Stadium.DrawWall(dl, record ? loc["banner.world_record"] : loc.Format("name.enter", game.EntryPlayer + 1), game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
-        dl.FillRect(0, Layout.FieldTop + 20, Screen.Width, 60, Palette.Black.WithAlpha(230));
+        Stadium.DrawWall(dl, loc, record ? loc["banner.world_record"] : loc.Format("name.enter", game.EntryPlayer + 1), game.Round, time * 20, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, time * 20 / Layout.PxPerMeterX);
+        DrawCard(dl, 12, Layout.FieldTop + 18, Screen.Width - 24, 64, record ? Palette.HudCyan : PlayerColor(game.EntryPlayer));
         string heading = record ? loc["record.enter"] : loc.Format("name.enter", game.EntryPlayer + 1);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 26, heading, record ? Palette.HudCyan : PlayerColor(game.EntryPlayer), 0.9, TextAlign.Center);
         if (record)
@@ -102,8 +167,9 @@ public static class Scenes
         {
             double x = Screen.Width / 2 - 24 + i * 24;
             bool cur = game.EntryCursor == i;
+            if (cur) dl.FillRect(x - 9, y - 3, 18, 22, Palette.HudDim);
             var color = cur && Math.Sin(time * 10) > 0 ? Palette.HudRed : Palette.White;
-            PixelFont.Draw(dl, x, y, game.EntryLetters[i].ToString(), color, 2.2, TextAlign.Center);
+            Hud.ShadowText(dl, x, y, game.EntryLetters[i].ToString(), color, 2.2, TextAlign.Center);
             if (cur)
             {
                 PixelFont.Draw(dl, x, y - 9, "↑", Palette.HudYellow, 0.9, TextAlign.Center);
@@ -126,9 +192,9 @@ public static class Scenes
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
         Hud.DrawScoreboard(dl, game, time);
         Stadium.DrawStands(dl, time * 20, time);
-        Stadium.DrawWall(dl, loc["name.enter_both"], game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
-        dl.FillRect(0, Layout.FieldTop + 20, Screen.Width, 60, Palette.Black.WithAlpha(230));
+        Stadium.DrawWall(dl, loc, loc["name.enter_both"], game.Round, time * 20, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, time * 20 / Layout.PxPerMeterX);
+        DrawCard(dl, 12, Layout.FieldTop + 18, Screen.Width - 24, 64, Palette.HudCyan);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 24, loc["name.enter_both"], Palette.HudCyan, 0.8, TextAlign.Center);
         for (int seat = 0; seat < 2; seat++)
         {
@@ -143,8 +209,9 @@ public static class Scenes
             {
                 double x = cx - 18 + i * 18;
                 bool cur = !slot.Done && slot.Cursor == i;
+                if (cur) dl.FillRect(x - 7, y - 2, 14, 18, color.Darker(0.3));
                 var letterColor = slot.Done ? color : cur && Math.Sin(time * 10) > 0 ? Palette.White : color;
-                PixelFont.Draw(dl, x, y, slot.Letters[i].ToString(), letterColor, 1.8, TextAlign.Center);
+                Hud.ShadowText(dl, x, y, slot.Letters[i].ToString(), letterColor, 1.8, TextAlign.Center);
                 if (cur)
                 {
                     PixelFont.Draw(dl, x, y - 8, "↑", Palette.HudYellow, 0.8, TextAlign.Center);
@@ -154,9 +221,48 @@ public static class Scenes
             if (slot.Done) PixelFont.Draw(dl, cx, Layout.FieldTop + 70, loc["name.ready"], Palette.HudGreen, 0.7, TextAlign.Center);
             var a = seat == 0 ? DemoP1 : DemoP2Human;
             a.Pose = slot.Done ? Pose.Celebrate : Pose.Idle;
-            AthleteSprite.Draw(dl, cx + (seat == 0 ? -40 : 40), Layout.FieldBottom - 4, a, time);
+            double ax = cx + (seat == 0 ? -40 : 40);
+            AthleteSprite.Draw(dl, ax, Layout.FieldBottom - 4, a, time);
         }
         PixelFont.Draw(dl, Screen.Width / 2, Screen.Height - 14, loc["name.hint"], Palette.HudGreen, 0.6, TextAlign.Center);
+    }
+
+    /// <summary>Little pictogram of the event next to the demo athlete on the event card.</summary>
+    private static void DrawEventProp(DrawList dl, EventKind kind, double x, double groundY, double time)
+    {
+        switch (kind)
+        {
+            case EventKind.Hurdles110m:
+                Stadium.DrawHurdle(dl, x + 18, groundY, 0);
+                break;
+            case EventKind.JavelinThrow:
+                {
+                    var dir = Vec2.FromAngle(-38);
+                    var tail = new Vec2(x + 10, groundY - 10) - dir * 9;
+                    var tip = new Vec2(x + 10, groundY - 10) + dir * 9;
+                    dl.Line(tail, tip, 1.1, Palette.Javelin);
+                    dl.Line(tip - dir * 3, tip, 1.6, Palette.JavelinTip);
+                    break;
+                }
+            case EventKind.HammerThrow:
+                {
+                    double a = time * 4;
+                    double hx = x + Math.Cos(a) * 14, hy = groundY - 10 + Math.Sin(a) * 4;
+                    dl.Line(x, groundY - 10, hx, hy, 0.8, Palette.Wire);
+                    dl.FillCircle(hx, hy, 2.8, Palette.Hammer);
+                    break;
+                }
+            case EventKind.HighJump:
+                dl.FillRect(x + 14, groundY - 30, 1.6, 30, Palette.Upright);
+                dl.FillRect(x + 14, groundY - 22, 30, 1.4, Palette.Bar);
+                dl.FillRect(x + 22, groundY - 22, 5, 1.4, Palette.FlagRed);
+                dl.FillPolygon(Palette.Mat, new Vec2(x + 16, groundY - 10), new Vec2(x + 44, groundY - 10), new Vec2(x + 46, groundY), new Vec2(x + 14, groundY));
+                break;
+            case EventKind.LongJump:
+                dl.FillPolygon(Palette.Sand, new Vec2(x + 12, groundY - 6), new Vec2(x + 46, groundY - 6), new Vec2(x + 50, groundY + 2), new Vec2(x + 8, groundY + 2));
+                dl.FillRect(x + 6, groundY - 6, 2.5, 8, Palette.Board);
+                break;
+        }
     }
 
     public static void DrawEventIntro(DrawList dl, Game game, double time)
@@ -165,13 +271,14 @@ public static class Scenes
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
         Hud.DrawScoreboard(dl, game, time);
         Stadium.DrawStands(dl, time * 30, time);
-        Stadium.DrawWall(dl, loc[game.CurrentEvent.Key()], game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
-        dl.FillRect(16, Layout.FieldTop + 10, Screen.Width - 32, 92, Palette.Black.WithAlpha(235));
+        Stadium.DrawWall(dl, loc, loc[game.CurrentEvent.Key()], game.Round, time * 30, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, time * 30 / Layout.PxPerMeterX);
+        DrawCard(dl, 16, Layout.FieldTop + 8, Screen.Width - 32, 94, Palette.HudYellow);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 16, loc.Format("hud.round", game.Round), Palette.HudOrange, 0.9, TextAlign.Center);
-        PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 28, loc[game.CurrentEvent.Key()], Palette.HudYellow, 1.4, TextAlign.Center);
+        DrawTitleText(dl, Screen.Width / 2, Layout.FieldTop + 28, loc[game.CurrentEvent.Key()], 1.4, Palette.HudYellow, Palette.HudRed.Darker(0.5));
         PixelFont.Draw(dl, Screen.Width / 2 - 36, Layout.FieldTop + 46, loc["hud.qualify"], Palette.HudGreen, 1, TextAlign.Right);
         Hud.DrawMark(dl, Screen.Width / 2 - 28, Layout.FieldTop + 46, game.CurrentEvent, Rules.QualifyingMark(game.CurrentEvent, game.Round), loc, Palette.HudCyan, Palette.HudGreen, 1);
+        dl.FillRect(28, Layout.FieldTop + 57, Screen.Width - 56, 0.5, Palette.HudYellow.Darker(0.5));
         var a = DemoP1;
         a.Pose = game.CurrentEvent switch
         {
@@ -188,11 +295,12 @@ public static class Scenes
             _ => Pose.Run,
         };
         a.AnimPhase = (time * 2) % 1;
+        double ground = Layout.FieldTop + 96;
         if (game.CurrentEvent == EventKind.HammerThrow)
         {
             // a live turn with the hammer, like in the event itself
             double heading = (time * 240) % 360;
-            double ax = 36, ground = Layout.FieldTop + 96;
+            double ax = 36;
             var ball = SpinnerSprite.BallAt(ax, ground, heading, SpinnerSprite.OrbitHeight(heading), 16);
             bool behind = Math.Sin(heading * Math.PI / 180.0) < 0;
             var colors = AthleteColors.For(a);
@@ -200,7 +308,7 @@ public static class Scenes
             void Ball()
             {
                 dl.Line(hands.X, hands.Y, ball.X, ball.Y, 0.8, Palette.Wire);
-                dl.FillCircle(ball.X, ball.Y, 2.4, Palette.Hammer);
+                dl.FillCircle(ball.X, ball.Y, 2.6, Palette.Hammer);
             }
             if (behind) Ball();
             SpinnerSprite.Draw(dl, ax, ground, heading, colors, a.PlayerIndex + 1);
@@ -214,8 +322,9 @@ public static class Scenes
             {
                 EventKind.Swimming100m => Layout.FieldTop + 86,
                 EventKind.LongHorse => Layout.FieldTop + 98,
-                _ => Layout.FieldTop + 96,
+                _ => ground,
             };
+            DrawEventProp(dl, game.CurrentEvent, 40, ground, time);
             AthleteSprite.Draw(dl, 36, introY, a, time);
             a.Rotation = 0;
             if (game.CurrentEvent == EventKind.Weightlifting) Stadium.DrawBarbell(dl, 36, introY - 29, 0, Rules.QualifyingMark(EventKind.Weightlifting, game.Round));
@@ -233,10 +342,12 @@ public static class Scenes
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
         Hud.DrawScoreboard(dl, game, time);
         Stadium.DrawStands(dl, time * 10, time);
-        Stadium.DrawWall(dl, loc[game.CurrentEvent.Key()], game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
-        dl.FillRect(16, Layout.FieldTop + 8, Screen.Width - 32, 100, Palette.Black.WithAlpha(235));
+        Stadium.DrawWall(dl, loc, loc[game.CurrentEvent.Key()], game.Round, time * 10, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, time * 10 / Layout.PxPerMeterX);
+        bool anyQualified = game.Outcomes.Any(o => o.Qualified);
+        DrawCard(dl, 16, Layout.FieldTop + 8, Screen.Width - 32, 100, anyQualified ? Palette.HudGreen : Palette.HudRed);
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 13, loc["outcome.title"], Palette.HudCyan, 1, TextAlign.Center);
+        dl.FillRect(28, Layout.FieldTop + 23, Screen.Width - 56, 0.5, Palette.HudDim);
         double y = Layout.FieldTop + 28;
         foreach (var o in game.Outcomes)
         {
@@ -256,7 +367,7 @@ public static class Scenes
             y += 4;
         }
         var a = DemoP1;
-        a.Pose = game.Outcomes.Any(o => o.Qualified) ? Pose.Celebrate : Pose.Fall;
+        a.Pose = anyQualified ? Pose.Celebrate : Pose.Fall;
         AthleteSprite.Draw(dl, Screen.Width - 36, Layout.FieldTop + 96, a, time);
     }
 
@@ -266,13 +377,16 @@ public static class Scenes
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
         Hud.DrawScoreboard(dl, game, time);
         Stadium.DrawStands(dl, time * 6, time);
-        Stadium.DrawWall(dl, loc["ceremony.title"], game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
+        Stadium.DrawWall(dl, loc, loc["ceremony.title"], game.Round, time * 6, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, time * 6 / Layout.PxPerMeterX);
         double baseY = Layout.FieldTop + 92;
-        // podium: 2nd (left), 1st (centre, tallest), 3rd (right)
-        dl.FillRect(72, baseY - 14, 36, 14, Palette.LightGrey);
-        dl.FillRect(108, baseY - 24, 40, 24, Palette.White);
-        dl.FillRect(148, baseY - 9, 36, 9, Palette.LightGrey);
+        // podium: 2nd (left), 1st (centre, tallest), 3rd (right), each step a flat block with a white top edge
+        dl.FillRect(72, baseY - 14, 36, 14, Palette.Grey);
+        dl.FillRect(108, baseY - 24, 40, 24, Palette.LightGrey);
+        dl.FillRect(148, baseY - 9, 36, 9, Palette.Grey);
+        dl.FillRect(72, baseY - 14, 36, 1, Palette.White);
+        dl.FillRect(108, baseY - 24, 40, 1, Palette.White);
+        dl.FillRect(148, baseY - 9, 36, 1, Palette.White);
         PixelFont.Draw(dl, 90, baseY - 12, "2", Palette.Black, 1, TextAlign.Center);
         PixelFont.Draw(dl, 128, baseY - 22, "1", Palette.Black, 1.2, TextAlign.Center);
         PixelFont.Draw(dl, 166, baseY - 8, "3", Palette.Black, 1, TextAlign.Center);
@@ -281,6 +395,8 @@ public static class Scenes
         DemoP1.Name = leader.Name;
         var champ = new Athlete(leader.Index, false, leader.Name) { Pose = Pose.Celebrate };
         AthleteSprite.Draw(dl, 128, baseY - 24, champ, time);
+        // the gold medal on the champion's chest, glinting white every now and then
+        dl.FillCircle(128.6, baseY - 24 - 13, 1.3, Math.Sin(time * 5) > 0.8 ? Palette.White : Palette.FlagGold);
         if (game.PlayerCount == 2)
         {
             var other = game.Players[1 - leader.Index];
@@ -292,15 +408,17 @@ public static class Scenes
             DemoP2.Pose = Pose.Idle;
             AthleteSprite.Draw(dl, 90, baseY - 14, DemoP2, time);
         }
+        dl.FillCircle(90.6, baseY - 14 - 13, 1.3, Palette.FlagSilver);
         // confetti
         for (int i = 0; i < 40; i++)
         {
             double seed = i * 37.1;
             double x = (seed * 7 + time * (20 + i % 5 * 6)) % Screen.Width;
             double y = Layout.FieldTop + ((seed * 3 + time * (18 + i % 3 * 9)) % 90);
-            dl.FillRect(x, y, 1.6, 1.6, Palette.Crowd[i % Palette.Crowd.Length]);
+            double spin = Math.Sin(time * 9 + i);
+            dl.FillRect(x, y, 1.6, 1.0 + Math.Abs(spin) * 1.2, Palette.Crowd[i % Palette.Crowd.Length]);
         }
-        PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 6, loc["ceremony.champion"] + " " + leader.Name, Palette.HudYellow, 1.2, TextAlign.Center);
+        Hud.ShadowText(dl, Screen.Width / 2, Layout.FieldTop + 6, loc["ceremony.champion"] + " " + leader.Name, Palette.HudYellow, 1.2, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2, Screen.Height - 14, loc["ceremony.next_round"], Palette.HudCyan, 0.7, TextAlign.Center);
         // the flag of the champion rising
         double rise = Math.Min(1, time / 4);
@@ -316,10 +434,10 @@ public static class Scenes
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
         Hud.DrawScoreboard(dl, game, time);
         Stadium.DrawStands(dl, 0, time);
-        Stadium.DrawWall(dl, loc["gameover.title"], game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
-        dl.FillRect(16, Layout.FieldTop + 14, Screen.Width - 32, 70, Palette.Black.WithAlpha(235));
-        PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 22, loc["gameover.title"], Palette.HudRed, 1.8, TextAlign.Center);
+        Stadium.DrawWall(dl, loc, loc["gameover.title"], game.Round, 0, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, 0);
+        DrawCard(dl, 16, Layout.FieldTop + 14, Screen.Width - 32, 70, Palette.HudRed);
+        DrawTitleText(dl, Screen.Width / 2, Layout.FieldTop + 22, loc["gameover.title"], 1.8, Palette.HudRed, Palette.HudRed.Darker(0.4));
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 44, loc["gameover.final_score"], Palette.HudCyan, 0.9, TextAlign.Center);
         double y = Layout.FieldTop + 54;
         for (int i = 0; i < game.PlayerCount; i++)
@@ -338,27 +456,33 @@ public static class Scenes
     {
         var loc = game.Localizer;
         dl.FillRect(0, 0, Screen.Width, Screen.Height, Palette.Black);
+        DrawSky(dl, Layout.StandsTop, time);
         Stadium.DrawStands(dl, time * 15, time);
-        Stadium.DrawWall(dl, loc["practice.title"], game.Round);
-        dl.FillRect(0, Layout.FieldTop, Screen.Width, Screen.Height - Layout.FieldTop, Palette.Grass);
-        PixelFont.Draw(dl, Screen.Width / 2, 10, loc["practice.title"], Palette.HudYellow, 1.6, TextAlign.Center);
-        PixelFont.Draw(dl, Screen.Width / 2, 30, loc.Format("practice.round", game.PracticeRound) + "  ←→", Palette.HudCyan, 1, TextAlign.Center);
-        PixelFont.Draw(dl, Screen.Width / 2, 44, loc[game.Mode.Key()] + " - " + loc[game.MenuPlayers == 1 ? "title.players_1" : "title.players_2"], Palette.White, 0.8, TextAlign.Center);
-        dl.FillRect(16, Layout.FieldTop + 6, Screen.Width - 32, 76, Palette.Black.WithAlpha(235));
+        Stadium.DrawWall(dl, loc, loc["practice.title"], game.Round, time * 15, time);
+        Stadium.DrawGrass(dl, Layout.FieldTop, Screen.Height - Layout.FieldTop, time * 15 / Layout.PxPerMeterX);
+        DrawTitleText(dl, Screen.Width / 2, 10, loc["practice.title"], 1.6, Palette.HudYellow, Palette.HudRed.Darker(0.5));
+        Hud.ShadowText(dl, Screen.Width / 2, 30, loc.Format("practice.round", game.PracticeRound) + "  ←→", Palette.HudCyan, 1, TextAlign.Center);
+        Hud.ShadowText(dl, Screen.Width / 2, 44, loc[game.Mode.Key()] + " - " + loc[game.MenuPlayers == 1 ? "title.players_1" : "title.players_2"], Palette.White, 0.8, TextAlign.Center);
+        DrawCard(dl, 16, Layout.FieldTop + 6, Screen.Width - 32, 76, Palette.HudCyan);
         var events = game.Mode.Events();
         for (int i = 0; i < events.Length; i++)
         {
             var kind = events[i];
             double y = Layout.FieldTop + 12 + i * 11;
             bool sel = kind == game.PracticeEvent;
-            if (sel) PixelFont.Draw(dl, 30, y, "→", Palette.HudRed, 1);
+            if (sel)
+            {
+                dl.FillRect(22, y - 2, Screen.Width - 44, 11, Palette.HudDim);
+                PixelFont.Draw(dl, 30 + Math.Sin(time * 6) * 1.2, y, "→", Palette.HudRed, 1);
+            }
             PixelFont.Draw(dl, 42, y, loc[kind.Key()], sel ? Palette.HudYellow : Palette.White, 1);
             Hud.DrawMark(dl, 236, y, kind, Rules.QualifyingMark(kind, game.PracticeRound), loc, sel ? Palette.HudCyan : Palette.Grey, Palette.HudGreen, 0.9, TextAlign.Right);
         }
         PixelFont.Draw(dl, Screen.Width / 2, Screen.Height - 14, loc["practice.hint"], Palette.HudGreen, 0.6, TextAlign.Center);
         DemoP1.Pose = Pose.Run;
         DemoP1.AnimPhase = (time * 2) % 1;
-        AthleteSprite.Draw(dl, 22 + (time * 30) % 20, Layout.FieldBottom + 10, DemoP1, time);
+        double ax = 22 + (time * 30) % 20;
+        AthleteSprite.Draw(dl, ax, Layout.FieldBottom + 10, DemoP1, time);
     }
 
     private static List<string> Wrap(string text, int maxChars)

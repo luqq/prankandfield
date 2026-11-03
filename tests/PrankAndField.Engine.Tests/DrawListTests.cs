@@ -95,6 +95,8 @@ public class PrimitivesTests
         Assert.Equal((0x10, 0x20, 0x30, 255), (c.R, c.G, c.B, c.A));
         Assert.Equal(128, c.WithAlpha(128).A);
         Assert.Equal(8, c.Darker(0.5).R);
+        Assert.Equal(255, c.Lighter(1).G);
+        Assert.Equal(c.A, c.Lighter(0.5).A);
         Assert.Equal(Rgba.Hex(0x808080), Rgba.Lerp(Rgba.Hex(0x000000), Rgba.Hex(0xFFFFFF), 0.5) with { R = 0x80, G = 0x80, B = 0x80 });
     }
 

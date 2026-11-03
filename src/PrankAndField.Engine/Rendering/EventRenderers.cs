@@ -5,31 +5,32 @@ using PrankAndField.Engine.Sprites;
 
 namespace PrankAndField.Engine.Rendering;
 
-/// <summary>Draws the playfield of each event: scenery, athletes, implements, critters and in-field readouts.</summary>
+/// <summary>Draws the playfield of each event: scenery, athletes, implements, critters, particles and in-field readouts.</summary>
 public static class EventRenderers
 {
-    public static void Draw(DrawList dl, Game game, EventSimulation sim, double time)
+    public static void Draw(DrawList dl, Game game, EventSimulation sim, double time, Fx fx)
     {
         switch (sim)
         {
             case SwimmingSimulation sw: DrawSwimming(dl, game, sw, time); break;
-            case HurdlesSimulation h: DrawRace(dl, game, h, time); break;
-            case RaceSimulation r: DrawRace(dl, game, r, time); break;
-            case LongJumpSimulation lj: DrawLongJump(dl, game, lj, time); break;
-            case JavelinSimulation jv: DrawJavelin(dl, game, jv, time); break;
-            case HammerSimulation hm: DrawHammer(dl, game, hm, time); break;
-            case HighJumpSimulation hj: DrawHighJump(dl, game, hj, time); break;
+            case HurdlesSimulation h: DrawRace(dl, game, h, time, fx); break;
+            case RaceSimulation r: DrawRace(dl, game, r, time, fx); break;
+            case LongJumpSimulation lj: DrawLongJump(dl, game, lj, time, fx); break;
+            case JavelinSimulation jv: DrawJavelin(dl, game, jv, time, fx); break;
+            case HammerSimulation hm: DrawHammer(dl, game, hm, time, fx); break;
+            case HighJumpSimulation hj: DrawHighJump(dl, game, hj, time, fx); break;
             case SkeetSimulation sk: DrawSkeet(dl, game, sk, time); break;
             case VaultSimulation v: DrawVault(dl, game, v, time); break;
             case ArcherySimulation ar: DrawArchery(dl, game, ar, time); break;
             case TripleJumpSimulation tj: DrawTripleJump(dl, game, tj, time); break;
             case WeightliftingSimulation wl: DrawWeightlifting(dl, game, wl, time); break;
         }
+        fx.DrawScreen(dl);
     }
 
     // ------------------------------------------------------------------ races
 
-    private static void DrawRace(DrawList dl, Game game, RaceSimulation race, double time)
+    private static void DrawRace(DrawList dl, Game game, RaceSimulation race, double time, Fx fx)
     {
         var loc = game.Localizer;
         // lane 2 on top (player 2 / computer), lane 1 below, each scrolling on its own.
@@ -56,14 +57,16 @@ public static class EventRenderers
                 }
             }
             double ax = Layout.ToScreenX(a.X, camera);
-            AthleteSprite.Draw(dl, ax, ground - a.Y * Layout.PxPerMeterY, a, time);
+            double heightPx = a.Y * Layout.PxPerMeterY;
+            AthleteSprite.Draw(dl, ax, ground - heightPx, a, time);
+            fx.Draw(dl, a.PlayerIndex, camera, ground);
             foreach (var c in race.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
             dl.PopClip();
         }
-        if (byIndex.Count == 1) dl.FillRect(0, Layout.StripATop, Screen.Width, Layout.StripHeight, Palette.Grass);
+        if (byIndex.Count == 1) Stadium.DrawGrass(dl, Layout.StripATop, Layout.StripHeight, 0);
         Hud.DrawRaceBand(dl, game, race);
         Stadium.DrawStands(dl, scrollForStands, time);
-        Stadium.DrawWall(dl, loc[race.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[race.Kind.Key()], game.Round, scrollForStands, time);
 
         // bottom bar: the human speed; with two human runners (local two-player or online) each gets a bar.
         var humans = race.Athletes.Where(a => !a.IsCpu).OrderBy(a => a.PlayerIndex).ToList();
@@ -85,14 +88,18 @@ public static class EventRenderers
         foreach (var a in race.Athletes.Where(x => x.Finished && race.Phase >= RacePhase.Results))
         {
             double top = race.Athletes.Count == 1 || a == byIndex[^1] ? Layout.StripBTop : Layout.StripATop;
-            if (a.Disqualified) PixelFont.Draw(dl, Screen.Width / 2, top + 2, loc["banner.foul"], Palette.HudRed, 1, TextAlign.Center);
-            else Hud.DrawTimer(dl, Screen.Width / 2, top + 2, a.FinishTime, a.IsCpu ? Palette.White : Palette.HudYellow, 1, TextAlign.Center);
+            if (a.Disqualified) Hud.ShadowText(dl, Screen.Width / 2, top + 2, loc["banner.foul"], Palette.HudRed, 1, TextAlign.Center);
+            else
+            {
+                dl.FillRect(Screen.Width / 2 - 20, top + 0.5, 40, 10, Palette.Black);
+                Hud.DrawTimer(dl, Screen.Width / 2, top + 2, a.FinishTime, a.IsCpu ? Palette.White : Palette.HudYellow, 1, TextAlign.Center);
+            }
         }
     }
 
     // ------------------------------------------------------------------ long jump
 
-    private static void DrawLongJump(DrawList dl, Game game, LongJumpSimulation lj, double time)
+    private static void DrawLongJump(DrawList dl, Game game, LongJumpSimulation lj, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = lj.CurrentAthlete;
@@ -103,18 +110,20 @@ public static class EventRenderers
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in lj.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
-        AthleteSprite.Draw(dl, ax, ground - a.Y * Layout.PxPerMeterY, a, time);
+        double heightPx = a.Y * Layout.PxPerMeterY;
+        AthleteSprite.Draw(dl, ax, ground - heightPx, a, time);
+        fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[lj.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[lj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm);
-        if (lj.ShowAngle) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, lj.Angle);
+        if (lj.ShowAngle) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, lj.Angle);
         DrawFieldBanner(dl, game, lj);
     }
 
     // ------------------------------------------------------------------ javelin
 
-    private static void DrawJavelin(DrawList dl, Game game, JavelinSimulation jv, double time)
+    private static void DrawJavelin(DrawList dl, Game game, JavelinSimulation jv, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = jv.CurrentAthlete;
@@ -142,14 +151,15 @@ public static class EventRenderers
             double jy = ground - jv.JavelinY * Layout.PxPerMeterY * Layout.FlightSquash;
             DrawJavelin(dl, jx, jy, -jv.JavelinAngle, 16);
         }
+        fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[jv.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[jv.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm);
-        if (jv.ShowAngle && jv.State == ThrowState.WindUp) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, jv.Angle);
+        if (jv.ShowAngle && jv.State == ThrowState.WindUp) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, jv.Angle);
         if (jv.State == ThrowState.Flight)
         {
-            PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(jv.Distance), Palette.White, 1, TextAlign.Right);
+            Hud.ShadowText(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(jv.Distance), Palette.White, 1, TextAlign.Right);
         }
         DrawFieldBanner(dl, game, jv);
     }
@@ -167,7 +177,7 @@ public static class EventRenderers
 
     // ------------------------------------------------------------------ hammer
 
-    private static void DrawHammer(DrawList dl, Game game, HammerSimulation hm, double time)
+    private static void DrawHammer(DrawList dl, Game game, HammerSimulation hm, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = hm.CurrentAthlete;
@@ -188,10 +198,8 @@ public static class EventRenderers
             double lift = hm.State == HammerState.Spinning ? Math.Clamp((hm.HammerHeading - HammerSimulation.StartHeading) / 180.0, 0, 1) : 0;
             double ballHeight = 1 + (SpinnerSprite.OrbitHeight(hm.HammerHeading) - 1) * lift;
             var ball = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, ballHeight);
-            var shadow = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, -0.5);
             bool behind = Math.Sin(hm.HammerHeading * Math.PI / 180.0) < 0;
             var ballColor = hm.State == HammerState.Spinning && hm.InReleaseArc ? Palette.HammerHot : Palette.Hammer;
-            dl.FillEllipse(shadow.X, shadow.Y, 2.6, 1.0, Palette.Black.WithAlpha(70));
 
             if (hm.State == HammerState.Fouled)
             {
@@ -217,17 +225,18 @@ public static class EventRenderers
             dl.FillCircle(hx, hy, 2.6, Palette.Hammer);
             dl.Line(hx, hy, hx - 4, hy - 3, 0.8, Palette.Wire);
         }
+        fx.Draw(dl, 0, camera, ground);
         foreach (var c in hm.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[hm.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[hm.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, hm.SpeedReadout(a.PlayerIndex), $"{loc["hud.spins"]} {hm.SpinsCompleted}");
         if (hm.State == HammerState.Flight)
-            PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
+            Hud.ShadowText(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
         DrawFieldBanner(dl, game, hm);
     }
 
-    /// <summary>Red arc on the ground in front of the circle, under the stretch of the orbit where a release is full distance.</summary>
+    /// <summary>Red arc on the ground in front of the circle, under the stretch of the orbit where a release is full distance; it blinks between two reds.</summary>
     private static void DrawReleaseGate(DrawList dl, double ax, double ground, double time)
     {
         const int segments = 10;
@@ -237,8 +246,7 @@ public static class EventRenderers
             double deg = -Rules.HammerReleaseArc + i * 2 * Rules.HammerReleaseArc / segments;
             pts[i] = SpinnerSprite.BallAt(ax, ground, deg, -0.5);
         }
-        byte alpha = (byte)(150 + 60 * Math.Sin(time * 6));
-        dl.Polyline(1.2, Palette.HammerHot.WithAlpha(alpha), pts);
+        dl.Polyline(1.2, Math.Sin(time * 6) > 0 ? Palette.HammerHot : Palette.HammerHot.Darker(0.7), pts);
     }
 
     private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color)
@@ -249,7 +257,7 @@ public static class EventRenderers
 
     // ------------------------------------------------------------------ high jump
 
-    private static void DrawHighJump(DrawList dl, Game game, HighJumpSimulation hj, double time)
+    private static void DrawHighJump(DrawList dl, Game game, HighJumpSimulation hj, double time, Fx fx)
     {
         var loc = game.Localizer;
         var a = hj.CurrentAthlete;
@@ -268,7 +276,8 @@ public static class EventRenderers
             double t = Math.Clamp((hj.FlightProgress - 0.5) / 0.5, 0, 1);
             matLift = Stadium.HighJumpMatLift * t * t * (3 - 2 * t);
         }
-        double ay = ground - a.Y * Layout.PxPerMeterY - matLift;
+        double heightPx = a.Y * Layout.PxPerMeterY;
+        double ay = ground - heightPx - matLift;
         if (hj.State == HighJumpState.Airborne)
         {
             // Fosbury flop: after the take-off stretch the jumper turns his back to the bar (mirrored sprite)
@@ -283,11 +292,12 @@ public static class EventRenderers
         {
             AthleteSprite.Draw(dl, ax, ay, a, time);
         }
+        fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[hj.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[hj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm, $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
-        if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 13, hj.Angle);
+        if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, hj.Angle);
         DrawFieldBanner(dl, game, hj);
     }
 
@@ -324,11 +334,11 @@ public static class EventRenderers
                 for (int k = 0; k < 4; k++)
                 {
                     double wx = ax - 10 - k * 6 - (time * 40) % 6;
-                    dl.FillRect(wx, waterLine + 1 + Math.Sin(time * 6 + k) * 1.2, 4, 1, Palette.White.WithAlpha(170));
+                    dl.FillRect(wx, waterLine + 1 + Math.Sin(time * 6 + k) * 1.2, 4, 1, Palette.WaterLight);
                 }
             }
             AthleteSprite.Draw(dl, ax, ay, a, time);
-            if (swimming) dl.FillRect(ax - 14, waterLine + 2.5, 28, 1.2, Palette.Water.WithAlpha(150));
+            if (swimming) dl.FillRect(ax - 14, waterLine + 2.5, 28, 1.2, Palette.Water);
             if (sw.IsChoking(a.PlayerIndex))
             {
                 for (int k = 0; k < 3; k++)
@@ -344,7 +354,7 @@ public static class EventRenderers
         if (byIndex.Count == 1) dl.FillRect(0, Layout.StripATop, Screen.Width, Layout.StripHeight, Palette.Grass);
         Hud.DrawRaceBand(dl, game, sw);
         Stadium.DrawStands(dl, scrollForStands, time);
-        Stadium.DrawWall(dl, loc[sw.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[sw.Kind.Key()], game.Round);
 
         // bottom bar: the human speed; with two human swimmers (local two-player or online) each gets a bar.
         var humans = sw.Athletes.Where(a => !a.IsCpu).OrderBy(a => a.PlayerIndex).ToList();
@@ -409,7 +419,7 @@ public static class EventRenderers
         foreach (var c in sk.Critters) Stadium.DrawCritter(dl, c, c.X * Layout.PxPerMeterX, ground, Layout.SkeetPxPerMeterY);
         dl.PopClip();
         Stadium.DrawStands(dl, 0, time);
-        Stadium.DrawWall(dl, loc[sk.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[sk.Kind.Key()], game.Round);
         Hud.DrawSpeedBar(dl, game, sk.SpeedReadout(a.PlayerIndex),
             loc.Format("hud.target", Math.Min(sk.Launched, Rules.SkeetTargets), Rules.SkeetTargets) + "   " + loc.Format("hud.streak", sk.Streak),
             Rules.SkeetTargets * 150, loc["hud.hits"] + "=", sk.Hits.ToString());
@@ -440,7 +450,7 @@ public static class EventRenderers
             Hud.DrawPrompt(dl, Math.Clamp(ax, 24, Screen.Width - 24), Layout.FieldTop + 6, loc["hud.land"], Palette.HudGreen);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[v.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[v.Kind.Key()], game.Round);
         bool flying = v.State is VaultState.PreFlight or VaultState.OnHorse or VaultState.Flight or VaultState.Landed;
         if (flying)
         {
@@ -504,13 +514,13 @@ public static class EventRenderers
         }
         dl.PopClip();
         Stadium.DrawStands(dl, 0, time);
-        Stadium.DrawWall(dl, loc[ar.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[ar.Kind.Key()], game.Round);
         // wind box, top left, as wide as its words (VIENTO is longer than WIND)
         string windArrow = ar.Wind > 0.05 ? "↑" : ar.Wind < -0.05 ? "↓" : "-";
         string windLabel = loc["hud.wind"];
         string windValue = windArrow + " " + Math.Abs(ar.Wind).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         double windW = 3 + PixelFont.Measure(windLabel, 0.7) + 5 + PixelFont.Measure(windValue, 0.7) + 3;
-        dl.FillRect(6, Layout.FieldTop + 4, windW, 11, Palette.Black.WithAlpha(210));
+        dl.FillRect(6, Layout.FieldTop + 4, windW, 11, Palette.Black);
         PixelFont.Draw(dl, 9, Layout.FieldTop + 6, windLabel, Palette.HudCyan, 0.7);
         PixelFont.Draw(dl, 6 + windW - 3, Layout.FieldTop + 6, windValue, Palette.White, 0.7, TextAlign.Right);
         Hud.DrawSpeedBar(dl, game, ar.SpeedReadout(a.PlayerIndex), loc.Format("hud.arrow", Math.Min(ar.ArrowIndex + 1, Rules.ArcheryArrows), Rules.ArcheryArrows), Rules.ArcheryArrows * 10 * 20, loc["hud.pts"] + "=", ar.Points.ToString());
@@ -536,7 +546,7 @@ public static class EventRenderers
             Hud.DrawPrompt(dl, Math.Clamp(ax, 24, Screen.Width - 24), Layout.FieldTop + 6, loc["hud.press"], Palette.HudYellow, tj.ContactLeft);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[tj.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[tj.Kind.Key()], game.Round);
         string phase = tj.Phase == AttemptPhase.Active && tj.State != TripleJumpState.Approach
             ? loc[tj.JumpPhase switch { 0 => "hud.hop", 1 => "hud.step", _ => "hud.jump" }]
             : string.Empty;
@@ -574,7 +584,7 @@ public static class EventRenderers
         {
             // balance meter above the lifter
             double mx = ax, my = Layout.FieldTop + 12;
-            dl.FillRect(mx - 30, my, 60, 7, Palette.Black.WithAlpha(210));
+            dl.FillRect(mx - 30, my, 60, 7, Palette.Black);
             dl.FillRect(mx - 28, my + 3, 56, 1, Palette.Grey);
             dl.FillRect(mx - 0.5, my + 1, 1, 5, Palette.HudGreen);
             dl.FillRect(mx + wl.Balance * 26 - 1.5, my + 1, 3, 5, Math.Abs(wl.Balance) > 0.7 ? Palette.HudRed : Palette.HudYellow);
@@ -586,7 +596,7 @@ public static class EventRenderers
             PixelFont.Draw(dl, ax, Layout.FieldTop + 12, loc["hud.no_lift"], Palette.HudRed, 1.2, TextAlign.Center);
         dl.PopClip();
         Stadium.DrawStands(dl, 0, time);
-        Stadium.DrawWall(dl, loc[wl.Kind.Key()], game.Round);
+        Stadium.DrawWall(dl, loc, loc[wl.Kind.Key()], game.Round);
         // weight on the bar, top right
         PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, $"{loc["hud.weight"]} {Math.Round(wl.Weight)} {loc["hud.kg"]}", Palette.White, 0.9, TextAlign.Right);
         string? label = wl.State == LiftState.Clean ? $"{(int)Math.Ceiling(wl.CleanTimeLeft)}" : null;
@@ -615,9 +625,11 @@ public static class EventRenderers
         if (sim.Banner == BannerKind.Mark)
         {
             double y = Layout.FieldTop + 10;
-            double w = 70, h = 14;
-            dl.FillRect(Screen.Width / 2 - w / 2, y, w, h, Palette.Black.WithAlpha(210));
-            Hud.DrawMark(dl, Screen.Width / 2, y + 3, sim.Kind, sim.BannerValue, loc, Palette.HudYellow, Palette.HudGreen, 1.2, TextAlign.Center);
+            double w = 74, h = 15;
+            dl.FillRect(Screen.Width / 2 - w / 2, y, w, h, Palette.Black);
+            dl.FillRect(Screen.Width / 2 - w / 2, y, w, 0.8, Palette.HudYellow);
+            dl.FillRect(Screen.Width / 2 - w / 2, y + h - 0.8, w, 0.8, Palette.HudYellow);
+            Hud.DrawMark(dl, Screen.Width / 2, y + 3.5, sim.Kind, sim.BannerValue, loc, Palette.HudYellow, Palette.HudGreen, 1.2, TextAlign.Center);
             return;
         }
         var color = sim.Banner is BannerKind.Foul or BannerKind.WrongDirection or BannerKind.Dizzy ? Palette.HudRed : Palette.HudYellow;

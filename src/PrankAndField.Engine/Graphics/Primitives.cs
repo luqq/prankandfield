@@ -9,6 +9,9 @@ public readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)
 
     public Rgba Darker(double factor = 0.7) => new((byte)(R * factor), (byte)(G * factor), (byte)(B * factor), A);
 
+    /// <summary>Moves the colour towards white: 0 keeps it, 1 is white.</summary>
+    public Rgba Lighter(double amount = 0.3) => Lerp(this, new Rgba(255, 255, 255, A), amount);
+
     public static Rgba Lerp(Rgba a, Rgba b, double t)
     {
         t = Math.Clamp(t, 0, 1);

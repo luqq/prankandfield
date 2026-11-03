@@ -1,6 +1,9 @@
 namespace PrankAndField.Engine.Graphics;
 
-/// <summary>The arcade palette, sampled from the original attract screens.</summary>
+/// <summary>
+/// The arcade palette, sampled from the original attract screens. Every colour is flat and opaque: the
+/// 1983 look is made of solid fills and hard edges, never gradients, glows or translucent shadows.
+/// </summary>
 public static class Palette
 {
     public static readonly Rgba Black = Rgba.Hex(0x000000);
@@ -18,20 +21,36 @@ public static class Palette
     public static readonly Rgba HudBlue = Rgba.Hex(0x4860F8);
     public static readonly Rgba HudPink = Rgba.Hex(0xF890B0);
     public static readonly Rgba HudRed = Rgba.Hex(0xF84040);
+    /// <summary>Dark cyan used for the unlit state of HUD highlights (selected rows, cursors).</summary>
+    public static readonly Rgba HudDim = Rgba.Hex(0x104040);
+    /// <summary>Unlit block of the speed bar.</summary>
+    public static readonly Rgba HudUnlit = Rgba.Hex(0x2D2D2D);
+
+    // evening sky of the title screen: three flat bands, a sun disc and pixel stars
+    public static readonly Rgba SkyTop = Rgba.Hex(0x070B24);
+    public static readonly Rgba SkyMid = Rgba.Hex(0x3A2060);
+    public static readonly Rgba SkyHorizon = Rgba.Hex(0xF07A3A);
+    public static readonly Rgba Sun = Rgba.Hex(0xFFE08A);
+    public static readonly Rgba Star = Rgba.Hex(0xF8F8FF);
 
     // stadium
     public static readonly Rgba Track = Rgba.Hex(0xC8684A);
     public static readonly Rgba TrackDark = Rgba.Hex(0xA85238);
     public static readonly Rgba LaneLine = Rgba.Hex(0xF4F4F4);
     public static readonly Rgba Grass = Rgba.Hex(0x3CB043);
+    public static readonly Rgba GrassStripe = Rgba.Hex(0x46BE4E);
     public static readonly Rgba GrassDark = Rgba.Hex(0x2F9437);
     public static readonly Rgba Sand = Rgba.Hex(0xD8C8A0);
+    public static readonly Rgba SandLight = Rgba.Hex(0xE8DCB8);
     public static readonly Rgba SandEdge = Rgba.Hex(0xB0A078);
     public static readonly Rgba Wall = Rgba.Hex(0x9C9C9C);
     public static readonly Rgba WallDark = Rgba.Hex(0x6E6E6E);
+    public static readonly Rgba Roof = Rgba.Hex(0x3A3D4E);
+    public static readonly Rgba RoofDark = Rgba.Hex(0x22242E);
     public static readonly Rgba StandRow = Rgba.Hex(0x8A8A8A);
     public static readonly Rgba StandRowAlt = Rgba.Hex(0x7A7A7A);
     public static readonly Rgba Rail = Rgba.Hex(0xE8E8E8);
+    public static readonly Rgba Floodlight = Rgba.Hex(0xFFF6C8);
     public static readonly Rgba Mat = Rgba.Hex(0x3858E8);
     public static readonly Rgba MatDark = Rgba.Hex(0x2840B0);
     public static readonly Rgba Bar = Rgba.Hex(0xF8F8F8);
@@ -42,16 +61,24 @@ public static class Palette
     public static readonly Rgba Hurdle = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba HurdleBar = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba HurdleStripe = Rgba.Hex(0x3050E0);
-    public static readonly Rgba Sky = Rgba.Hex(0x101828);
     public static readonly Rgba Cage = Rgba.Hex(0xB0B0B0);
     public static readonly Rgba Board = Rgba.Hex(0xF8F8F8);
     public static readonly Rgba Plasticine = Rgba.Hex(0xE8E870);
+    public static readonly Rgba Scoreboard = Rgba.Hex(0x0A0A12);
+    public static readonly Rgba ScoreboardText = Rgba.Hex(0xFFB048);
 
     public static readonly Rgba[] Crowd =
     [
         Rgba.Hex(0xF04040), Rgba.Hex(0x40E040), Rgba.Hex(0x4060F0), Rgba.Hex(0xF0E040),
         Rgba.Hex(0xF08040), Rgba.Hex(0x40E0E0), Rgba.Hex(0xF040F0), Rgba.Hex(0xF8F8F8),
         Rgba.Hex(0xF0C090), Rgba.Hex(0x90F090), Rgba.Hex(0x9090F0), Rgba.Hex(0xE0E0E0),
+        Rgba.Hex(0x3030A0), Rgba.Hex(0xA03030), Rgba.Hex(0x30A080), Rgba.Hex(0xE0A0C0),
+    ];
+
+    /// <summary>Skin tones of the crowd, so the terraces look like people rather than confetti.</summary>
+    public static readonly Rgba[] CrowdSkin =
+    [
+        Rgba.Hex(0xF2C4A0), Rgba.Hex(0xE0A880), Rgba.Hex(0xB07850), Rgba.Hex(0x7C4A2A), Rgba.Hex(0xF8D8B8),
     ];
 
     // athletes
@@ -73,6 +100,12 @@ public static class Palette
     public static readonly Rgba Hammer = Rgba.Hex(0x404040);
     public static readonly Rgba HammerHot = Rgba.Hex(0xF84040);
     public static readonly Rgba Wire = Rgba.Hex(0xC0C0C0);
+
+    // effects (flat pixels)
+    public static readonly Rgba Dust = Rgba.Hex(0xE2D2B0);
+    public static readonly Rgba SandSpray = Rgba.Hex(0xEADFC0);
+    public static readonly Rgba MatSpray = Rgba.Hex(0x90A8FF);
+    public static readonly Rgba Spark = Rgba.Hex(0xFFF0A0);
 
     // critters
     public static readonly Rgba Mole = Rgba.Hex(0x6A4A2A);
@@ -121,5 +154,4 @@ public static class Palette
     public static readonly Rgba FlagYellow = Rgba.Hex(0xF8D020);
     public static readonly Rgba FlagGold = Rgba.Hex(0xF8D020);
     public static readonly Rgba FlagSilver = Rgba.Hex(0xD0D0D8);
-    public static readonly Rgba FlagBronze = Rgba.Hex(0xC08040);
 }

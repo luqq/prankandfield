@@ -155,5 +155,8 @@
   "touch.run": "CORRER",
   "touch.action": "SALTAR / LANZAR",
   "touch.start": "INICIO",
+  "stadium.ad_cup": "COPA VECTOR",
+  "crt.button": "CRT",
+  "crt.tooltip": "Líneas de barrido CRT",
   "credit.by": "Diseñado y desarrollado por {0}"
 }
