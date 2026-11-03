@@ -364,6 +364,48 @@ public class VaultTests
     }
 
     [Fact]
+    public void TheBoardPressIsJudgedWhereThePlayerSawTheVaulter()
+    {
+        // At 900 cm/s every tick is a 15 cm stride: the press must be judged at the position drawn when the
+        // button went down, not one stride later, or the sweet spot moves on screen.
+        var sim = New();
+        double? seenGap = null;
+        double? quality = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var v = (VaultSimulation)s;
+            if (v.CurrentTry > 1 || v.Phase != AttemptPhase.Active) return (InputFrame.None, InputFrame.None);
+            if (v.State == VaultState.Ready) return (new InputFrame(Run1: true), InputFrame.None);
+            if (v.State == VaultState.Approach)
+            {
+                if (seenGap is null && v.BoardX - v.CurrentAthlete.X <= 0.6) { seenGap = v.BoardX - v.CurrentAthlete.X; return (new InputFrame(Action: true), InputFrame.None); }
+            }
+            else quality ??= v.BoardQuality;
+            return (InputFrame.None, InputFrame.None);
+        });
+        Assert.NotNull(seenGap);
+        Assert.NotNull(quality);
+        double expected = Math.Clamp(1 - Math.Abs(seenGap!.Value - Rules.VaultBoardSweetSpot) / (Rules.VaultBoardZone - Rules.VaultBoardSweetSpot), 0, 1);
+        Assert.Equal(expected, quality!.Value, 6);
+    }
+
+    [Fact]
+    public void ARunUpStartedJustBeforeTheIdleTimeoutStillCounts()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11);
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var v = (VaultSimulation)s;
+            bool waiting = v.CurrentTry == 1 && v.Elapsed < 1.6 + Rules.FieldAttemptTimeout - 1.5; // try card, then 18.5 s on the mark
+            return (waiting ? InputFrame.None : bot.NextForSimulation(s), InputFrame.None);
+        }, maxSeconds: 150);
+        var first = sim.AttemptsFor(0)[0];
+        Assert.False(first.Foul);
+        Assert.True(first.Mark >= 8.5, $"score {first.Mark}");
+    }
+
+    [Fact]
     public void TappingTheRunButtonsAddsNothingToTheFixedSpeed()
     {
         double? ScoreWith(Func<int, InputFrame> runInput)

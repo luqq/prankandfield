@@ -243,4 +243,25 @@ public sealed class HighJumpSimulation : FieldEventSimulation
         // clearance on the third summon the mole.
         if (result.Foul) _misses[a.PlayerIndex]++;
     }
+
+    /// <summary>Only an untouched attempt times out: once RUN is pressed the run-up ends by itself within seconds.</summary>
+    protected override bool AttemptIsIdle => State == HighJumpState.Ready;
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)State);
+        foreach (var b in _bar) h.Add(b);
+        foreach (var m in _misses) h.Add(m);
+        h.Add(_takeoffX);
+        h.Add(_runSpeed);
+        h.Add(_rise);
+        h.Add(_travel);
+        h.Add(_flightTime);
+        h.Add(_flightDuration);
+        h.Add(_crossedBar);
+        h.Add(BarFallen);
+        h.Add(BarFallAnim);
+        h.Add(Angle);
+    }
 }

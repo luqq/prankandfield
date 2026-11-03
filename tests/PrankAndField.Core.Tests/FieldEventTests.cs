@@ -725,6 +725,53 @@ public class HighJumpTests
     }
 
     [Fact]
+    public void ARunUpStartedJustBeforeTheIdleTimeoutStillCounts()
+    {
+        // The 20 s idle timeout is for an untouched attempt: once the RUN button has been pressed the
+        // run-up, the take-off and the flight (about 2.5 s) finish even if they cross the 20 s mark.
+        var sim = New();
+        var bot = Jumper();
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var hj = (HighJumpSimulation)s;
+            bool waiting = hj.CurrentTry == 1 && hj.Elapsed < 1.6 + Rules.FieldAttemptTimeout - 1.5; // 1.6 s try card, then 18.5 s on the mark
+            return (waiting ? InputFrame.None : bot.NextForSimulation(s), InputFrame.None);
+        }, maxSeconds: 150);
+        Assert.Equal(2.30, sim.AttemptsFor(0)[0].Mark);
+        Assert.Equal(0, sim.MissesFor(0));
+    }
+
+    [Fact]
+    public void TheBarHeightsAreInTheLockstepChecksum()
+    {
+        // Same inputs, same athlete motion, different opening bars: before the first attempt is over nothing
+        // but the private bar heights differs, and the checksum must still tell the two games apart.
+        var a = New(round: 1);
+        var b = New(round: 2);
+        var botA = Jumper();
+        var botB = Jumper();
+        var ea = new ButtonEdges();
+        var eb = new ButtonEdges();
+        var none = new ButtonEdges();
+        int guard = 0;
+        while (a.State != HighJumpState.Airborne && guard++ < 2000)
+        {
+            ea.Update(botA.NextForSimulation(a));
+            eb.Update(botB.NextForSimulation(b));
+            a.Tick(Game.TickSeconds, ea, none);
+            b.Tick(Game.TickSeconds, eb, none);
+        }
+        Assert.Equal(HighJumpState.Airborne, a.State);
+        Assert.Equal(HighJumpState.Airborne, b.State);
+        Assert.Equal(a.CurrentAthlete.X, b.CurrentAthlete.X);
+        var ha = new StateHash();
+        var hb = new StateHash();
+        a.AddChecksum(ref ha);
+        b.AddChecksum(ref hb);
+        Assert.NotEqual(ha.Value, hb.Value);
+    }
+
+    [Fact]
     public void PerfectTechniqueClearsTheLastHeightOfTheLastRoundButNotMuchMore()
     {
         // The run-up speed is fixed, so the ceiling of the event is set by Rules alone: the best angle on
@@ -732,6 +779,21 @@ public class HighJumpTests
         double peak = Rules.HighJumpPeak(Rules.HighJumpRunSpeed / 100.0, 75, Rules.HighJumpZoneBest);
         Assert.True(Rules.HighJumpClears(peak, 2.48), $"peak {peak}");
         Assert.False(Rules.HighJumpClears(peak, 2.54), $"peak {peak}");
+    }
+
+    [Fact]
+    public void TheBotClearsEveryBarOfTheLastRoundOnTheRealTickGrid()
+    {
+        // Take-off spots and release angles are quantised by the 60 Hz tick (about 17 cm and 1.8 degrees per
+        // tick at the fixed speed), so the round-4 ladder must be clearable in the simulation, not only in the
+        // continuous Rules optimum.
+        var sim = New(round: 4);
+        var bot = Jumper();
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        var tries = sim.AttemptsFor(0);
+        Assert.Equal(2.40, tries[0].Mark);
+        Assert.Equal(2.44, tries[1].Mark);
+        Assert.Equal(2.48, tries[2].Mark);
     }
 
     [Fact]
