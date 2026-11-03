@@ -82,7 +82,7 @@ public abstract class FieldEventSimulation : EventSimulation
             case AttemptPhase.Active:
                 _attemptTime += dt;
                 TickAttempt(dt, CurrentAthlete, InputFor(CurrentAthlete, p1, p2));
-                if (Phase == AttemptPhase.Active && _attemptTime > Rules.FieldAttemptTimeout)
+                if (Phase == AttemptPhase.Active && _attemptTime > Rules.FieldAttemptTimeout && AttemptIsIdle)
                 {
                     // Nobody is playing: the attempt is forfeited so the game never hangs.
                     CurrentAthlete.Runner.SpeedCm = 0;
@@ -152,6 +152,30 @@ public abstract class FieldEventSimulation : EventSimulation
     protected abstract void TickAttempt(double dt, Athlete a, ButtonEdges e);
     protected virtual void TickAfterAttempt(double dt, Athlete a) { }
     protected virtual void OnAttemptCompleted(Athlete a, Attempt result) { }
+
+    /// <summary>
+    /// True while the attempt can still be forfeited for inactivity after <see cref="Rules.FieldAttemptTimeout"/>.
+    /// An event whose attempt is a sequence of timed steps (the lift) answers false once it is under way.
+    /// </summary>
+    protected virtual bool AttemptIsIdle => true;
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)Phase);
+        h.Add(_turnIndex);
+        h.Add(CurrentTry);
+        h.Add(_phaseTimer);
+        h.Add(_attemptTime);
+        foreach (var row in _attempts)
+        {
+            foreach (var at in row)
+            {
+                h.Add(at.Mark);
+                h.Add(at.Foul);
+            }
+        }
+    }
 
     /// <summary>Common approach-run step: apply presses, integrate, animate.</summary>
     protected static void RunStep(Athlete a, ButtonEdges e, double dt)

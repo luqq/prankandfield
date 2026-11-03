@@ -40,6 +40,17 @@ public class RoomRegistryTests
     }
 
     [Fact]
+    public void RoomsRememberTheGameTheyWereCreatedFor()
+    {
+        var rooms = new RoomRegistry();
+        Assert.Equal(0, rooms.Create("a").Mode);
+        var hyper = rooms.Create("b", mode: 1);
+        Assert.Equal(1, hyper.Mode);
+        Assert.Equal(JoinError.None, rooms.TryJoin(hyper.Code, "c", out var joined));
+        Assert.Equal(1, joined!.Mode);
+    }
+
+    [Fact]
     public void LeavingClosesTheRoomForBoth()
     {
         var rooms = new RoomRegistry();

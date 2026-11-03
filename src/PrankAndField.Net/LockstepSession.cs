@@ -7,7 +7,8 @@ namespace PrankAndField.Net;
 /// <param name="LocalSeat">0 plays as P1, 1 as P2.</param>
 /// <param name="InputDelay">Ticks between sampling a local input and simulating it (hides the round trip).</param>
 /// <param name="ChecksumInterval">Every this many ticks the peers exchange <see cref="Game.Checksum"/>.</param>
-public sealed record MatchSettings(uint Seed, int LocalSeat, int InputDelay = 4, int ChecksumInterval = 60);
+/// <param name="Mode">The game both peers play (chosen by whoever opened the room, handed out by the server).</param>
+public sealed record MatchSettings(uint Seed, int LocalSeat, int InputDelay = 4, int ChecksumInterval = 60, GameMode Mode = GameMode.TrackAndField);
 
 /// <summary>
 /// Deterministic lockstep over a <see cref="Game"/>: each peer samples its own input, schedules it
@@ -33,7 +34,7 @@ public sealed class LockstepSession
         // A fresh record board: local records would give one peer the world record bonus and not the other.
         Game = game ?? new Game(records: new WorldRecords(), seed: settings.Seed, online: true);
         if (!Game.IsOnline) throw new ArgumentException("The game must be created in online mode.", nameof(game));
-        Game.StartOnlineCredit();
+        Game.StartOnlineCredit(settings.Mode);
 
         // Nobody can have pressed anything during the first InputDelay ticks.
         for (int t = 0; t < settings.InputDelay; t++)

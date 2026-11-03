@@ -20,6 +20,15 @@ public enum Pose
     Flop,        // high jump bar clearance
     Celebrate,
     Dizzy,
+
+    // Hyper Sports
+    Swim,        // front crawl, drawn lying in the water
+    Breathe,     // crawl with the head turned up for air
+    Aim,         // shooting / archery stance, arms forward
+    Handstand,   // hands on the horse, body inverted
+    Clean,       // bar held at the chest, knees bent
+    Lift,        // bar overhead
+    Collapse,    // dropped the bar, sat down
 }
 
 /// <summary>Runtime state of one athlete on the field (world units: metres, seconds).</summary>
