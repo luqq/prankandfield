@@ -62,10 +62,17 @@ public static class Rules
     public const double FirstHurdle = 13.72;
     public const double HurdleSpacing = 9.14;
     public const int HurdleCount = 10;
-    public const double HurdleAirTime = 0.6;
+    // A hurdle is cleared with one press of JUMP. The RUN buttons do nothing while the hurdler is in the air, so the race
+    // is won in the three strides between barriers: there every press is worth more than in the dash, the flight is short
+    // and a clean jump costs the arcade's net 100 cm/s (300 lost at take-off, 200 back on landing). With the test bot a
+    // rhythm of 8 taps/s runs about 13.0 s (the dash takes 12.6 at the same rhythm), 9 taps/s about 11.3 and 10 or more
+    // about 10.5, where the pace sits at the arcade maximum between hurdles; 7 taps/s stays just over the 14.50 standard.
+    public const double HurdleAirTime = 0.45;          // seconds off the ground
     public const double HurdleClearMin = 0.1;          // fraction of the arc where the barrier may be crossed safely
     public const double HurdleClearMax = 0.9;
-    public const double HurdleTakeoffPenalty = 150;    // cm/s
+    public const double HurdleTakeoffPenalty = 300;    // cm/s lost when the jump begins (arcade figure)
+    public const double HurdleLandingBoost = 200;      // cm/s given back on landing (arcade figure), never more than the take-off took
+    public const double HurdleImpulseScale = 1.4;      // a RUN press between hurdles adds 140 cm/s instead of the dash's 100
     public const double HurdleMinorHitPenalty = 300;   // cm/s
     public const double HurdleMajorHitSpeed = 200;     // cm/s set on a full collision
     public const double StumbleDuration = 0.6;

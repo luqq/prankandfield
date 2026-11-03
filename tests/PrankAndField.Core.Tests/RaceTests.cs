@@ -173,4 +173,107 @@ public class HurdlesTests
         Assert.True(sim.AthleteFor(1)!.Finished);
         Assert.True(sim.HurdlesFor(1).Count(h => h.Fallen) <= 1);
     }
+
+    [Theory]
+    [InlineData(8, 11.8, 14.0)]  // a casual rhythm clears round 1 (14.50) with room for a clipped hurdle
+    [InlineData(9, 10.6, 12.5)]  // ...and the round-4 standard (12.50)
+    [InlineData(11, 9.4, 11.4)]
+    public void TappingRhythmDeterminesTheTimeOverTheHurdles(double hz, double min, double max)
+    {
+        var sim = New();
+        var bot = new Bot(0, hz);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.DoesNotContain(sim.HurdlesFor(0), h => h.Fallen);
+        Assert.InRange(sim.MarkFor(0)!.Value, min, max);
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(10)]
+    public void TenHurdlesCostLittleMoreThanTheTenExtraMetres(double hz)
+    {
+        // Same rhythm over 100 m flat and over 110 m with ten barriers: the hurdler may lose a second, not several.
+        var dash = new DashSimulation(1, [new Athlete(0, false, "AAA"), new Athlete(1, true, "CPU")], new Rng(5));
+        var dashBot = new Bot(0, hz);
+        SimulationRunner.RunUntilFinished(dash, s => (dashBot.NextForSimulation(s), InputFrame.None));
+        var hurdles = New();
+        var hurdlesBot = new Bot(0, hz);
+        SimulationRunner.RunUntilFinished(hurdles, s => (hurdlesBot.NextForSimulation(s), InputFrame.None));
+        double gap = hurdles.MarkFor(0)!.Value - dash.MarkFor(0)!.Value;
+        Assert.InRange(gap, -0.5, 1.5);
+    }
+
+    [Fact]
+    public void TakeoffCostsSpeedAndTheLandingGivesPartOfItBack()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11);
+        double beforeTakeoff = 0;
+        double? airborne = null, landed = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var a = sim.AthleteFor(0)!;
+            if (sim.IsAirborne(0)) airborne ??= a.Runner.SpeedCm;
+            else if (airborne is null) beforeTakeoff = a.Runner.SpeedCm;
+            else landed ??= a.Runner.SpeedCm;
+            return (landed is null ? bot.NextForSimulation(s) : InputFrame.None, InputFrame.None);
+        }, maxSeconds: 10);
+        Assert.NotNull(airborne);
+        Assert.NotNull(landed);
+        Assert.True(beforeTakeoff > Rules.HurdleTakeoffPenalty, $"took off at {beforeTakeoff} cm/s");
+        // the press of the take-off tick may still add one impulse before the penalty
+        double impulse = Runner.ImpulseAlternate * Rules.HurdleImpulseScale;
+        Assert.InRange(airborne.Value, beforeTakeoff - Rules.HurdleTakeoffPenalty, beforeTakeoff - Rules.HurdleTakeoffPenalty + impulse);
+        // speed is frozen in the air, then the landing gives the boost back minus one tick of drag
+        Assert.InRange(landed.Value, airborne.Value + Rules.HurdleLandingBoost - 30, airborne.Value + Rules.HurdleLandingBoost);
+    }
+
+    [Fact]
+    public void HoppingFromAStandstillGivesNoFreeSpeed()
+    {
+        var sim = New();
+        bool hopped = false;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            if (sim.Phase == RacePhase.Running && !hopped && sim.RaceTime > 0.1)
+            {
+                hopped = true;
+                return (new InputFrame(Action: true), InputFrame.None);
+            }
+            return (InputFrame.None, InputFrame.None);
+        }, maxSeconds: 8);
+        Assert.True(hopped);
+        Assert.False(sim.IsAirborne(0));
+        Assert.Equal(0, sim.AthleteFor(0)!.Runner.SpeedCm);
+        Assert.Equal(0, sim.AthleteFor(0)!.X, 3);
+    }
+
+    [Fact]
+    public void RunPressesAreWorthMoreBetweenHurdlesThanInTheDash()
+    {
+        var sim = New();
+        Assert.All(sim.Athletes, a => Assert.Equal(Rules.HurdleImpulseScale, a.Runner.ImpulseScale));
+        Assert.True(Rules.HurdleImpulseScale > 1);
+        var dash = new DashSimulation(1, [new Athlete(0, false, "AAA"), new Athlete(1, true, "CPU")], new Rng(5));
+        Assert.All(dash.Athletes, a => Assert.Equal(1.0, a.Runner.ImpulseScale));
+    }
+
+    [Fact]
+    public void KnockedHurdlesChangeTheChecksum()
+    {
+        var clean = New();
+        var cleanBot = new Bot(0, 11);
+        var crash = New();
+        var crashBot = new Bot(0, 11);
+        // tick both until the first hurdles are behind the runner (the gun fires about five seconds in), the crasher never jumping
+        SimulationRunner.RunUntilFinished(clean, s => (cleanBot.NextForSimulation(s), InputFrame.None), maxSeconds: 9);
+        SimulationRunner.RunUntilFinished(crash, s => (crashBot.NextForSimulation(s) with { Action = false }, InputFrame.None), maxSeconds: 9);
+        Assert.Equal(0, clean.FallenCount(0));
+        Assert.True(crash.FallenCount(0) >= 1);
+        var h1 = new StateHash();
+        clean.AddChecksum(ref h1);
+        var h2 = new StateHash();
+        crash.AddChecksum(ref h2);
+        Assert.NotEqual(h1.Value, h2.Value);
+    }
 }
