@@ -113,5 +113,8 @@
   "touch.run": "RUN",
   "touch.action": "JUMP / THROW",
   "touch.start": "START",
+  "stadium.ad_cup": "VECTOR CUP",
+  "crt.button": "CRT",
+  "crt.tooltip": "CRT scanlines",
   "credit.by": "Designed and developed by {0}"
 }

@@ -1,5 +1,6 @@
 using PrankAndField.Core;
 using PrankAndField.Core.Events;
+using PrankAndField.Core.Localization;
 using PrankAndField.Engine.Graphics;
 
 namespace PrankAndField.Engine.Rendering;
@@ -11,7 +12,8 @@ namespace PrankAndField.Engine.Rendering;
 /// </summary>
 public static class Stadium
 {
-    private static readonly string[] AdTexts = ["HIRYU SOFT", "PRANK & FIELD", "VECTOR CUP", "1983"];
+    /// <summary>Studio name and year on the advertising boards; the other two boards come from the localizer.</summary>
+    private const string AdStudio = "HIRYU SOFT", AdYear = "1983";
     private static readonly (Rgba Back, Rgba Fore)[] AdColors =
     [
         (Rgba.Hex(0x1A2A7A), Palette.HudYellow), (Palette.FlagRed, Palette.White),
@@ -112,8 +114,9 @@ public static class Stadium
     /// The wall between the stands and the field: advertising boards scrolling with the stands, the electronic
     /// board with the event name in the middle and two flags fluttering at the ends.
     /// </summary>
-    public static void DrawWall(DrawList dl, string eventName, int round, double scrollPx = 0, double time = 0)
+    public static void DrawWall(DrawList dl, Localizer loc, string eventName, int round, double scrollPx = 0, double time = 0)
     {
+        string[] ads = [AdStudio, loc["game.title"], loc["stadium.ad_cup"], AdYear];
         double top = Layout.WallTop, h = Layout.WallBottom - Layout.WallTop;
         dl.FillRect(0, top, Screen.Width, h, Palette.Wall);
         dl.FillRect(0, top, Screen.Width, 1.2, Palette.WallDark);
@@ -128,20 +131,20 @@ public static class Stadium
         const double flagL = 7, flagR = 21, flag2L = Screen.Width - 23, flag2R = Screen.Width - 9;
         bool Covered(double l, double r) => (r >= bx - 1 && l <= bx + boardW + 1) || (r >= flagL && l <= flagR) || (r >= flag2L && l <= flag2R);
         const double panelW = 64;
-        double cycle = panelW * AdTexts.Length;
+        double cycle = panelW * ads.Length;
         double off = Mod(scrollPx * 0.5, cycle);
-        for (int i = -1; i <= (int)(Screen.Width / panelW) + AdTexts.Length; i++)
+        for (int i = -1; i <= (int)(Screen.Width / panelW) + ads.Length; i++)
         {
             double x = i * panelW - off;
             if (x > Screen.Width || x + panelW < 0) continue;
             if (x + 2 >= bx - 1 && x + panelW - 2 <= bx + boardW + 1) continue; // fully hidden behind the board
-            int idx = ((i % AdTexts.Length) + AdTexts.Length) % AdTexts.Length;
+            int idx = ((i % ads.Length) + ads.Length) % ads.Length;
             var (back, fore) = AdColors[idx];
             dl.FillRect(x + 2, top + 3, panelW - 4, 8, back);
-            double adW = PixelFont.Measure(AdTexts[idx], 0.7);
+            double adW = PixelFont.Measure(ads[idx], 0.7);
             double adL = x + panelW / 2 - adW / 2, adR = adL + adW;
             if (!Covered(adL, adR))
-                PixelFont.Draw(dl, x + panelW / 2, top + 4.6, AdTexts[idx], fore, 0.7, TextAlign.Center);
+                PixelFont.Draw(dl, x + panelW / 2, top + 4.6, ads[idx], fore, 0.7, TextAlign.Center);
         }
         dl.FillRect(bx - 1, top + 1, boardW + 2, h - 2, Palette.WallDark);
         dl.FillRect(bx, top + 2, boardW, h - 4, Palette.Scoreboard);
@@ -494,10 +497,10 @@ public static class Stadium
         double barY = groundY - barPx;
         if (barFallAnim <= 0)
         {
-            dl.FillRect(barX - 1, barY - 0.7, 44, 1.4, Palette.Bar);
+            dl.FillRect(barX - 1, barY - 0.7, 46, 1.4, Palette.Bar);
             dl.FillRect(barX + 9, barY - 0.7, 6, 1.4, Palette.FlagRed);
             dl.FillRect(barX + 27, barY - 0.7, 6, 1.4, Palette.FlagRed);
-            dl.FillRect(barX + 42, barY - 1.9, 1.4, 3.6, Palette.LightGrey);
+            dl.FillRect(barX + 43.4, barY - 1.9, 1.4, 3.6, Palette.LightGrey);
         }
         else
         {
@@ -506,7 +509,7 @@ public static class Stadium
             double nearDrop = Math.Min(1, barFallAnim * 1.6);
             double matNear = groundY - 11, matFar = groundY - 13;
             var a = new Vec2(barX + 3 + nearDrop * 4, barY + (matNear - barY) * nearDrop * nearDrop);
-            var b = new Vec2(barX + 41 - g * 2, barY + (matFar - barY) * g);
+            var b = new Vec2(barX + 43 - g * 2, barY + (matFar - barY) * g);
             dl.Line(a, b, 1.4, Palette.Bar);
             var mid = (a + b) * 0.5;
             dl.FillCircle(mid.X, mid.Y, 1.1, Palette.FlagRed);

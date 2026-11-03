@@ -98,7 +98,6 @@ public static class Palette
     public static readonly Rgba Javelin = Rgba.Hex(0xE8E8E8);
     public static readonly Rgba JavelinTip = Rgba.Hex(0xA0A0A0);
     public static readonly Rgba Hammer = Rgba.Hex(0x404040);
-    public static readonly Rgba HammerShine = Rgba.Hex(0x8A8A96);
     public static readonly Rgba HammerHot = Rgba.Hex(0xF84040);
     public static readonly Rgba Wire = Rgba.Hex(0xC0C0C0);
 

@@ -21,7 +21,7 @@
                     disabled="@(Host.OnlineLocked && Host.Online is null)" title="@(Host.OnlineLocked ? T("online.locked") : null)">@T("online.button")</button>
         }
         <button class="paf-btn" type="button" @onclick="ToggleMute" title="Mute">@(_muted ? "🔇" : "🔊")</button>
-        <button class="paf-btn paf-crt-btn @(_crt ? "paf-on" : "")" type="button" @onclick="ToggleCrt" title="CRT scanlines">CRT</button>
+        <button class="paf-btn paf-crt-btn @(_crt ? "paf-on" : "")" type="button" @onclick="ToggleCrt" title="@T("crt.tooltip")">@T("crt.button")</button>
         <button class="paf-btn" type="button" @onclick="ToggleFullscreen" title="Fullscreen">⛶</button>
         <span class="paf-credit" title="@T("credit.by", "Hiryu Soft")">
             <svg class="paf-credit-logo" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">

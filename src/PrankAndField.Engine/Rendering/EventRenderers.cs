@@ -60,7 +60,7 @@ public static class EventRenderers
         if (byIndex.Count == 1) Stadium.DrawGrass(dl, Layout.StripATop, Layout.StripHeight, 0);
         Hud.DrawRaceBand(dl, game, race);
         Stadium.DrawStands(dl, scrollForStands, time);
-        Stadium.DrawWall(dl, loc[race.Kind.Key()], game.Round, scrollForStands, time);
+        Stadium.DrawWall(dl, loc, loc[race.Kind.Key()], game.Round, scrollForStands, time);
 
         // bottom bar: the human speed; with two human runners (local two-player or online) each gets a bar.
         var humans = race.Athletes.Where(a => !a.IsCpu).OrderBy(a => a.PlayerIndex).ToList();
@@ -109,7 +109,7 @@ public static class EventRenderers
         fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[lj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
+        Stadium.DrawWall(dl, loc, loc[lj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm);
         if (lj.ShowAngle) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, lj.Angle);
         DrawFieldBanner(dl, game, lj);
@@ -148,7 +148,7 @@ public static class EventRenderers
         fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[jv.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
+        Stadium.DrawWall(dl, loc, loc[jv.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm);
         if (jv.ShowAngle && jv.State == ThrowState.WindUp) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, jv.Angle);
         if (jv.State == ThrowState.Flight)
@@ -217,14 +217,13 @@ public static class EventRenderers
             double hx = Layout.ToScreenX(hm.HammerX, camera);
             double hy = ground - hm.HammerY * Layout.PxPerMeterY * Layout.FlightSquash;
             dl.FillCircle(hx, hy, 2.6, Palette.Hammer);
-            dl.FillCircle(hx - 0.9, hy - 0.9, 0.9, Palette.HammerShine);
             dl.Line(hx, hy, hx - 4, hy - 3, 0.8, Palette.Wire);
         }
         fx.Draw(dl, 0, camera, ground);
         foreach (var c in hm.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[hm.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
+        Stadium.DrawWall(dl, loc, loc[hm.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, hm.SpeedReadout(a.PlayerIndex), $"{loc["hud.spins"]} {hm.SpinsCompleted}");
         if (hm.State == HammerState.Flight)
             Hud.ShadowText(dl, Screen.Width - 6, Layout.FieldTop + 4, Stadium.FormatMeters(hm.Distance), Palette.White, 1, TextAlign.Right);
@@ -248,7 +247,6 @@ public static class EventRenderers
     {
         dl.Line(handX, handY, hx, hy, 0.8, Palette.Wire);
         dl.FillCircle(hx, hy, 2.8, color);
-        dl.FillCircle(hx - 1, hy - 1, 0.9, color == Palette.Hammer ? Palette.HammerShine : Palette.White);
     }
 
     // ------------------------------------------------------------------ high jump
@@ -291,7 +289,7 @@ public static class EventRenderers
         fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
-        Stadium.DrawWall(dl, loc[hj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
+        Stadium.DrawWall(dl, loc, loc[hj.Kind.Key()], game.Round, camera * Layout.PxPerMeterX, time);
         Hud.DrawSpeedBar(dl, game, a.Runner.SpeedCm, $"{loc["hud.bar"]} {Stadium.FormatMeters(hj.BarHeight)}");
         if (hj.ShowAngle && hj.State == HighJumpState.Rising) Hud.DrawAngleBox(dl, Math.Clamp(ax, 20, Screen.Width - 20), Layout.FieldBottom - 15, hj.Angle);
         DrawFieldBanner(dl, game, hj);

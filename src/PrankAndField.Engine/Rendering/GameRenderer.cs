@@ -49,11 +49,11 @@ public sealed class GameRenderer
                 break;
             case GameState.EventOutcome:
                 Scenes.DrawOutcome(dl, game, time);
-                _fx.DrawScreen(dl);
+                DrawScreenFx(dl);
                 break;
             case GameState.Ceremony:
                 Scenes.DrawCeremony(dl, game, time);
-                _fx.DrawScreen(dl);
+                DrawScreenFx(dl);
                 break;
             case GameState.GameOver:
                 Scenes.DrawGameOver(dl, game, time);
@@ -66,5 +66,16 @@ public sealed class GameRenderer
                 break;
         }
         return dl;
+    }
+
+    /// <summary>
+    /// Screen-space particles (fireworks) on the screens that paint the scoreboard first: clipped under it,
+    /// so the sparks rise behind the board instead of over the scores.
+    /// </summary>
+    private void DrawScreenFx(DrawList dl)
+    {
+        dl.PushClip(0, Layout.HudBottom, Screen.Width, Screen.Height - Layout.HudBottom);
+        _fx.DrawScreen(dl);
+        dl.PopClip();
     }
 }

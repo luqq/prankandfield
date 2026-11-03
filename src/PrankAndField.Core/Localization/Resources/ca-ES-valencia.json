@@ -113,5 +113,8 @@
   "touch.run": "CÓRRER",
   "touch.action": "BOTAR / LLANÇAR",
   "touch.start": "INICI",
+  "stadium.ad_cup": "COPA VECTOR",
+  "crt.button": "CRT",
+  "crt.tooltip": "Línies d'escombratge CRT",
   "credit.by": "Dissenyat i desenvolupat per {0}"
 }

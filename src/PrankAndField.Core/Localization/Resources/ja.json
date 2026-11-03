@@ -113,5 +113,8 @@
   "touch.run": "走る",
   "touch.action": "ジャンプ / 投げる",
   "touch.start": "スタート",
+  "stadium.ad_cup": "ベクトルカップ",
+  "crt.button": "CRT",
+  "crt.tooltip": "CRTの走査線",
   "credit.by": "デザイン・開発: {0}"
 }
