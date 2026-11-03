@@ -31,6 +31,7 @@ const state = {
   resizeObserver: null,
   listeners: [],
   fps: { frames: 0, last: 0 },
+  crt: false,
 };
 
 // ------------------------------------------------------------------ bridge to .NET
@@ -92,6 +93,7 @@ function installConsoleHelpers() {
     },
     setLanguage,
     setMuted,
+    setCrt,
   };
 }
 
@@ -111,6 +113,7 @@ export async function start(canvasId, rootId, language) {
   try {
     records = localStorage.getItem("paf.records");
     if (!lang) lang = localStorage.getItem("paf.lang") || navigator.language || "en";
+    state.crt = localStorage.getItem("paf.crt") === "1";
   } catch { /* storage may be unavailable */ }
 
   await state.bridge.init(records, lang);
@@ -157,6 +160,17 @@ export function focusCanvas() {
   state.canvas?.focus();
 }
 
+/** Scanline / vignette overlay that mimics the arcade monitor. Remembered between visits. */
+export function setCrt(on) {
+  state.crt = !!on;
+  try { localStorage.setItem("paf.crt", state.crt ? "1" : "0"); } catch { /* ignore */ }
+  return state.crt;
+}
+
+export function getCrt() {
+  return state.crt;
+}
+
 export function toggleFullscreen(rootId) {
   const el = document.getElementById(rootId);
   if (!el) return;
@@ -184,7 +198,13 @@ async function loop(ts) {
     state.running = false;
     return;
   }
-  render(buf);
+  try {
+    render(buf);
+  } catch (err) {
+    // A bad frame must not stop the simulation; log the first few and keep going.
+    state.paintErrors = (state.paintErrors || 0) + 1;
+    if (state.paintErrors <= 3) console.error("[paf] paint failed", err);
+  }
   if (state.running) state.raf = requestAnimationFrame(loop);
 }
 
@@ -215,7 +235,16 @@ function resize() {
 }
 
 function render(buf) {
-  const canvas = state.canvas, ctx = state.ctx;
+  paint(state.canvas, buf, state.ctx, { crt: state.crt, onAudio: handleAudio });
+}
+
+/**
+ * Paints one encoded draw list on a canvas, letterboxed to the 256x224 logical screen.
+ * Exported so visual tests can render frames produced by the .NET engine without the game loop.
+ * `opts.crt` adds the scanline / vignette overlay; `opts.onAudio(kind, a, b)` receives the audio section.
+ */
+export function paint(canvas, buf, ctx = null, opts = {}) {
+  ctx = ctx || canvas.getContext("2d", { alpha: false });
   const scale = Math.min(canvas.width / LOGICAL_W, canvas.height / LOGICAL_H);
   const ox = (canvas.width - LOGICAL_W * scale) / 2;
   const oy = (canvas.height - LOGICAL_H * scale) / 2;
@@ -230,6 +259,7 @@ function render(buf) {
   const n = buf.length;
   let clipDepth = 0;
   let color = "#000";
+  const rgba = (r, g, b, a) => `rgba(${r},${g},${b},${a / 255})`;
   while (i < n) {
     const op = buf[i];
     switch (op) {
@@ -237,7 +267,7 @@ function render(buf) {
         i = n;
         break;
       case 1: { // color
-        color = `rgba(${buf[i + 1]},${buf[i + 2]},${buf[i + 3]},${buf[i + 4] / 255})`;
+        color = rgba(buf[i + 1], buf[i + 2], buf[i + 3], buf[i + 4]);
         ctx.fillStyle = color;
         ctx.strokeStyle = color;
         i += 5;
@@ -310,11 +340,42 @@ function render(buf) {
         i += 3 + 2 * count;
         break;
       }
+      case 11: { // gradient rect: x y w h  r1 g1 b1 a1  r2 g2 b2 a2  horizontal
+        const x = buf[i + 1], y = buf[i + 2], w = buf[i + 3], h = buf[i + 4];
+        const horizontal = buf[i + 13] === 1;
+        const g = horizontal ? ctx.createLinearGradient(x, y, x + w, y) : ctx.createLinearGradient(x, y, x, y + h);
+        g.addColorStop(0, rgba(buf[i + 5], buf[i + 6], buf[i + 7], buf[i + 8]));
+        g.addColorStop(1, rgba(buf[i + 9], buf[i + 10], buf[i + 11], buf[i + 12]));
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = color;
+        i += 14;
+        break;
+      }
+      case 12: { // glow: cx cy r  r g b a
+        const cx = buf[i + 1], cy = buf[i + 2], r = buf[i + 3];
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        g.addColorStop(0, rgba(buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7]));
+        g.addColorStop(1, rgba(buf[i + 4], buf[i + 5], buf[i + 6], 0));
+        ctx.fillStyle = g;
+        ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+        ctx.fillStyle = color;
+        i += 8;
+        break;
+      }
+      case 13: { // arc: cx cy r startDeg endDeg width
+        ctx.lineWidth = buf[i + 6];
+        ctx.beginPath();
+        ctx.arc(buf[i + 1], buf[i + 2], buf[i + 3], buf[i + 4] * Math.PI / 180, buf[i + 5] * Math.PI / 180);
+        ctx.stroke();
+        i += 7;
+        break;
+      }
       case 100: { // audio section
         const count = buf[i + 1];
         for (let k = 0; k < count; k++) {
           const kind = buf[i + 2 + 3 * k], a = buf[i + 3 + 3 * k], b = buf[i + 4 + 3 * k];
-          try { handleAudio(kind, a, b); } catch (err) { console.warn("[paf] audio event failed", kind, err); } // audio must never stop the game
+          try { opts.onAudio?.(kind, a, b); } catch (err) { console.warn("[paf] audio event failed", kind, err); } // audio must never stop the game
         }
         i += 2 + 3 * count;
         break;
@@ -325,6 +386,36 @@ function render(buf) {
     }
   }
   while (clipDepth > 0) { ctx.restore(); clipDepth--; }
+  if (opts.crt) crtOverlay(ctx, canvas, scale, ox, oy);
+}
+
+// ---- CRT look: faint scanlines and a vignette, drawn in device pixels over the finished frame ----
+
+const crt = { pattern: null, step: 0 };
+
+function crtOverlay(ctx, canvas, scale, ox, oy) {
+  const step = Math.max(2, Math.round(scale));
+  if (!crt.pattern || crt.step !== step) {
+    const tile = document.createElement("canvas");
+    tile.width = 1;
+    tile.height = step;
+    const t = tile.getContext("2d");
+    t.clearRect(0, 0, 1, step);
+    t.fillStyle = "rgba(0,0,0,0.22)";
+    t.fillRect(0, step - 1, 1, 1);
+    crt.pattern = ctx.createPattern(tile, "repeat");
+    crt.step = step;
+  }
+  const w = LOGICAL_W * scale, h = LOGICAL_H * scale;
+  ctx.setTransform(1, 0, 0, 1, ox, oy);
+  ctx.fillStyle = crt.pattern;
+  ctx.fillRect(0, 0, w, h);
+  const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.75);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(0,0,0,0.38)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 function handleAudio(kind, a, b) {

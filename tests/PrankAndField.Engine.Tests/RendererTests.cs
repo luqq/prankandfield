@@ -36,6 +36,9 @@ public class RendererTests
                 case Op.ClipPush: i += 5; break;
                 case Op.ClipPop: i += 1; break;
                 case Op.AudioSection: { int n = (int)buf[i + 1]; i += 2 + 3 * n; break; }
+                case Op.GradientRect: { for (int k = 1; k <= 4; k++) Coord(buf[i + k]); Assert.True(buf[i + 13] is 0 or 1, "gradient direction"); i += 14; break; }
+                case Op.Glow: Coord(buf[i + 1]); Coord(buf[i + 2]); Assert.True(buf[i + 3] > 0, "glow radius"); i += 8; break;
+                case Op.Arc: Coord(buf[i + 1]); Coord(buf[i + 2]); Assert.True(buf[i + 3] > 0 && buf[i + 6] > 0, "arc radius/width"); i += 7; break;
                 default: Assert.Fail($"unknown opcode {op} at {i}"); return commands;
             }
         }
@@ -155,6 +158,10 @@ public class AthleteSpriteTests
                 case Op.FillCircle: AssertNear(arr[i + 1], arr[i + 2]); i += 4; break;
                 case Op.Line: AssertNear(arr[i + 1], arr[i + 2]); AssertNear(arr[i + 3], arr[i + 4]); i += 6; break;
                 case Op.FillPoly: { int n = (int)arr[i + 1]; for (int k = 0; k < n; k++) AssertNear(arr[i + 2 + 2 * k], arr[i + 3 + 2 * k]); i += 2 + 2 * n; break; }
+                case Op.Polyline: { int n = (int)arr[i + 2]; for (int k = 0; k < n; k++) AssertNear(arr[i + 3 + 2 * k], arr[i + 4 + 2 * k]); i += 3 + 2 * n; break; }
+                case Op.FillEllipse: AssertNear(arr[i + 1], arr[i + 2]); i += 5; break;
+                case Op.Glow: AssertNear(arr[i + 1], arr[i + 2]); i += 8; break;
+                case Op.Arc: AssertNear(arr[i + 1], arr[i + 2]); i += 7; break;
                 default: Assert.Fail("unexpected op " + arr[i]); break;
             }
         }
