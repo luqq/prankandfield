@@ -93,17 +93,27 @@ public static class Rules
         Math.Max(0.5, 0.5 * Ballistics.Range(speedMps, angleDeg) + 2.0); // 9 m/s at 45 degrees ~ 6.1 m, 11.8 m/s ~ 9.0 m
 
     // --- Javelin ----------------------------------------------------------------------------
+    // The thrower runs up, presses THROW before the line to plant his feet and keeps it held: a dial climbs
+    // from 20 to 70 degrees and the javelin leaves his hand when the button is released, or by itself when
+    // the dial tops out. The mark is measured from the foul line and nothing in flight changes it.
     public const double JavelinLine = 30.0;
-    public const double JavelinArmSpeed = 11.0;        // m/s added by the arm (a 7.8 m/s run-up at 45 degrees clears 60 m)
+    public const double JavelinArmSpeed = 11.0;        // m/s added by the arm
     public const double JavelinRunFactor = 0.75;
-    public const double JavelinRunHoldBonus = 0.20;    // up to +20% when holding RUN during flight
+    public const double JavelinRangeFactor = 2.5;      // arcade scale on the ballistic range: 7 taps/s at 45 degrees throws ~73 m, 6 taps/s ~61 m, 9 taps/s ~86 m
     public const double JavelinBirdApex = 20.0;        // metres: higher than this hits the bird
-    public const double JavelinAngleRate = 150;        // degrees per second while holding (faster than the jump)
+    public const double JavelinAngleStart = 20;        // the dial starts here when the thrower plants: nobody throws flat
+    public const double JavelinAngleMax = 70;          // ...and throws by itself when it gets here, so nobody parks at a bad angle
+    public const double JavelinAngleRate = 60;         // degrees per second while holding: 45 comes 0.42 s after the plant, 70 at 0.83 s
+    public const double JavelinBestAngle = 45;         // longest throw (the range curve is symmetric around it: 20 and 70 throw the same)
 
     public static double JavelinLaunchSpeed(double runSpeedMps) => runSpeedMps * JavelinRunFactor + JavelinArmSpeed;
 
     public static double JavelinDistance(double launchSpeedMps, double angleDeg) =>
-        Math.Max(1.0, 2.3 * Ballistics.Range(launchSpeedMps, angleDeg));
+        Math.Max(1.0, JavelinRangeFactor * Ballistics.Range(launchSpeedMps, angleDeg));
+
+    /// <summary>Seconds the dial needs to climb from <see cref="JavelinAngleStart"/> to <paramref name="angleDeg"/>.</summary>
+    public static double JavelinHoldFor(double angleDeg) =>
+        (Math.Clamp(angleDeg, JavelinAngleStart, JavelinAngleMax) - JavelinAngleStart) / JavelinAngleRate;
 
     // --- Hammer -----------------------------------------------------------------------------
     public const int HammerMaxSpins = 10;

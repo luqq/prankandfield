@@ -93,6 +93,22 @@ public class JavelinTests
 {
     private static JavelinSimulation New(uint seed = 1) => new(1, [new Athlete(0, false, "AAA")], new Rng(seed));
 
+    /// <summary>Runs the first try with the bot and returns the angle the javelin left the hand at.</summary>
+    private static double ReleaseAngleOfFirstTry(Bot bot, JavelinSimulation sim, Func<InputFrame, JavelinSimulation, InputFrame>? tweak = null)
+    {
+        double? released = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var jv = (JavelinSimulation)s;
+            if (jv.CurrentTry == 1 && jv.State is ThrowState.Flight or ThrowState.Landed) released ??= jv.ReleaseAngle;
+            var f = bot.NextForSimulation(s);
+            if (tweak is not null) f = tweak(f, jv);
+            return (f, InputFrame.None);
+        });
+        Assert.NotNull(released);
+        return released!.Value;
+    }
+
     [Fact]
     public void AGoodThrowQualifies()
     {
@@ -100,7 +116,18 @@ public class JavelinTests
         var bot = new Bot(0, 11);
         SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
         Assert.True(sim.IsFinished);
-        Assert.True(sim.MarkFor(0) is > 50 and < 120, $"mark {sim.MarkFor(0)}");
+        Assert.True(sim.MarkFor(0) is > 85 and < 110, $"mark {sim.MarkFor(0)}");
+        Assert.True(sim.DidQualify(0));
+    }
+
+    [Fact]
+    public void AModestRunUpReleasedNearTheBestAngleClearsTheFirstStandard()
+    {
+        // About 7 taps a second is a comfortable keyboard rhythm: it clears round 1 (60 m) and round 2 (70 m), not round 3.
+        var sim = New();
+        var bot = new Bot(0, 7);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.True(sim.MarkFor(0) is >= 70 and < 80, $"mark {sim.MarkFor(0)}");
         Assert.True(sim.DidQualify(0));
     }
 
@@ -123,6 +150,136 @@ public class JavelinTests
             return (bot.NextForSimulation(s), InputFrame.None);
         });
         Assert.NotNull(releaseX);
+    }
+
+    [Fact]
+    public void TheDialStartsAt20AndClimbs60DegreesPerSecond()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11) { JavelinAngle = 1000 }; // never lets go
+        var samples = new List<(double Angle, bool Shown)>();
+        double? released = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var jv = (JavelinSimulation)s;
+            if (jv.CurrentTry == 1 && jv.State == ThrowState.WindUp) samples.Add((jv.Angle, jv.ShowAngle));
+            if (jv.CurrentTry == 1 && jv.State == ThrowState.Flight) released ??= jv.ReleaseAngle;
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
+        Assert.NotEmpty(samples);
+        Assert.Equal(Rules.JavelinAngleStart, samples[0].Angle, 6);
+        Assert.All(samples, x => Assert.True(x.Shown)); // the dial is on screen the whole wind-up
+        // every tick while held adds rate * dt...
+        for (int i = 1; i < samples.Count; i++)
+            Assert.Equal(samples[i - 1].Angle + Rules.JavelinAngleRate * Game.TickSeconds, samples[i].Angle, 6);
+        // ...and the tick that would pass the top throws instead, at exactly the top
+        Assert.True(samples[^1].Angle < Rules.JavelinAngleMax);
+        Assert.True(samples[^1].Angle + Rules.JavelinAngleRate * Game.TickSeconds >= Rules.JavelinAngleMax - 1e-6);
+        Assert.Equal(Rules.JavelinAngleMax, released!.Value, 6);
+    }
+
+    [Fact]
+    public void HoldingPastTheTopThrowsByItselfAt70Degrees()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11) { JavelinAngle = 1000 }; // never lets go
+        double windUpStart = -1, windUpEnd = -1;
+        double angle = ReleaseAngleOfFirstTry(bot, sim, (f, jv) =>
+        {
+            if (jv.CurrentTry == 1 && jv.State == ThrowState.WindUp) { if (windUpStart < 0) windUpStart = jv.Elapsed; windUpEnd = jv.Elapsed; }
+            return f;
+        });
+        Assert.Equal(Rules.JavelinAngleMax, angle, 6);
+        Assert.InRange(windUpEnd - windUpStart, Rules.JavelinHoldFor(Rules.JavelinAngleMax) - 0.05, Rules.JavelinHoldFor(Rules.JavelinAngleMax) + 0.05);
+        Assert.False(sim.AttemptsFor(0)[0].Foul);
+        Assert.InRange(sim.AttemptsFor(0)[0].Mark!.Value, 55, 75); // a legal throw, a third shorter than the ~100 m this run-up gets at 45
+    }
+
+    [Fact]
+    public void ReleasingOnTheTickTheDialTopsOutIsOneThrowAt70Degrees()
+    {
+        // The bot lets go the moment it sees the dial one step short of the top: the sim clamps the dial
+        // at 70 and sees the release on that very tick. One throw, at 70, not a foul.
+        var sim = New();
+        var bot = new Bot(0, 11) { JavelinAngle = Rules.JavelinAngleMax - Rules.JavelinAngleRate * Game.TickSeconds - 1e-6 };
+        int throwCues = 0;
+        double angle = ReleaseAngleOfFirstTry(bot, sim, (f, jv) =>
+        {
+            while (jv.TryDequeueCue(out var c)) if (c == AudioCue.SfxThrow && jv.CurrentTry == 1) throwCues++;
+            return f;
+        });
+        Assert.Equal(Rules.JavelinAngleMax, angle, 6);
+        Assert.Equal(1, throwCues);
+        Assert.False(sim.AttemptsFor(0)[0].Foul);
+    }
+
+    [Fact]
+    public void ATapThrowsAtTheBottomOfTheDial()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11) { JavelinAngle = 0 }; // lets go on the first wind-up tick
+        double angle = ReleaseAngleOfFirstTry(bot, sim);
+        Assert.InRange(angle, Rules.JavelinAngleStart, Rules.JavelinAngleStart + Rules.JavelinAngleRate * Game.TickSeconds + 1e-9);
+        Assert.False(sim.AttemptsFor(0)[0].Foul);
+        Assert.InRange(sim.AttemptsFor(0)[0].Mark!.Value, 55, 75); // a legal throw, a third shorter than the ~100 m this run-up gets at 45
+    }
+
+    [Fact]
+    public void TheEndsOfTheDialThrowMuchShorterThanTheBestAngleWithTheSameRunUp()
+    {
+        double MarkAt(double angle)
+        {
+            var sim = New();
+            var bot = new Bot(0, 11) { JavelinAngle = angle };
+            SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+            return sim.AttemptsFor(0)[0].Mark!.Value;
+        }
+        double best = MarkAt(Rules.JavelinBestAngle); // ~100 m
+        double top = MarkAt(1000);                    // held until the dial throws by itself at 70: ~64 m
+        double tap = MarkAt(0);                       // let go at once, 21 degrees: ~67 m
+        Assert.True(top < 0.7 * best, $"top {top} best {best}");
+        Assert.True(tap < 0.7 * best, $"tap {tap} best {best}");
+        Assert.True(Math.Abs(top - tap) < 0.1 * best, $"top {top} tap {tap}"); // the dial is symmetric around the best angle
+    }
+
+    [Fact]
+    public void TheBestAngleThrowsFarthestAndTheEndsOfTheDialThrowTheSame()
+    {
+        double v = Rules.JavelinLaunchSpeed(10);
+        double best = Rules.JavelinDistance(v, Rules.JavelinBestAngle);
+        for (double a = Rules.JavelinAngleStart; a <= Rules.JavelinAngleMax; a += 1)
+            Assert.True(Rules.JavelinDistance(v, a) <= best + 1e-9, $"{a} degrees beats {Rules.JavelinBestAngle}");
+        Assert.Equal(Rules.JavelinDistance(v, Rules.JavelinAngleStart), Rules.JavelinDistance(v, Rules.JavelinAngleMax), 6);
+        // ten degrees either side of the best angle still gives 94 % of the throw
+        Assert.True(Rules.JavelinDistance(v, Rules.JavelinBestAngle - 10) > 0.93 * best);
+        Assert.True(Rules.JavelinDistance(v, Rules.JavelinBestAngle + 10) > 0.93 * best);
+    }
+
+    [Fact]
+    public void TheMarkIsFixedAtTheReleaseAndNothingInFlightChangesIt()
+    {
+        double Mark(bool mashInFlight)
+        {
+            var sim = New();
+            var bot = new Bot(0, 11);
+            double? atRelease = null;
+            SimulationRunner.RunUntilFinished(sim, s =>
+            {
+                var jv = (JavelinSimulation)s;
+                var f = bot.NextForSimulation(s);
+                if (jv.CurrentTry == 1 && jv.State == ThrowState.Flight)
+                {
+                    atRelease ??= jv.Distance;
+                    Assert.Equal(atRelease.Value, jv.Distance, 6);
+                    if (mashInFlight) f = new InputFrame(Run1: jv.Elapsed % 0.1 < 0.05, Run2: jv.Elapsed % 0.1 >= 0.05, Action: true);
+                }
+                return (f, InputFrame.None);
+            });
+            Assert.NotNull(atRelease);
+            Assert.Equal(Rules.Snap(atRelease!.Value), sim.AttemptsFor(0)[0].Mark!.Value, 6);
+            return sim.AttemptsFor(0)[0].Mark!.Value;
+        }
+        Assert.Equal(Mark(false), Mark(true), 6);
     }
 
     [Fact]
@@ -157,40 +314,23 @@ public class JavelinTests
     }
 
     [Fact]
-    public void HoldingRunDuringFlightAddsDistance()
+    public void AFastRunUpHeldToTheTopHitsTheBird()
     {
-        double WithHold(bool hold)
-        {
-            var sim = New();
-            var bot = new Bot(0, 11);
-            SimulationRunner.RunUntilFinished(sim, s =>
-            {
-                var f = bot.NextForSimulation(s);
-                var jv = (JavelinSimulation)s;
-                if (jv.State == ThrowState.Flight && !hold) f = InputFrame.None;
-                return (f, InputFrame.None);
-            });
-            return sim.AttemptsFor(0)[0].Mark!.Value;
-        }
-        double held = WithHold(true);
-        double plain = WithHold(false);
-        Assert.True(held > plain * 1.1, $"held {held} plain {plain}");
+        var sim = New();
+        var bot = new Bot(0, 14) { JavelinAngle = 1000 }; // hold until the dial throws by itself
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.True(sim.BonusPoints[0] >= Rules.BonusPoints, "bird bonus expected");
+        Assert.Contains(AudioCue.SfxBird, SimulationRunner.DrainCues(sim));
     }
 
     [Fact]
-    public void ASteepPowerfulThrowHitsTheBird()
+    public void AThrowAtTheBestAngleMissesTheBird()
     {
         var sim = New();
-        var bot = new Bot(0, 14);
-        SimulationRunner.RunUntilFinished(sim, s =>
-        {
-            var f = bot.NextForSimulation(s);
-            var jv = (JavelinSimulation)s;
-            if (jv.State == ThrowState.WindUp) f = f with { Action = jv.Angle < 85 };
-            return (f, InputFrame.None);
-        });
-        Assert.True(sim.BonusPoints[0] >= Rules.BonusPoints, "bird bonus expected");
-        Assert.Contains(AudioCue.SfxBird, SimulationRunner.DrainCues(sim));
+        var bot = new Bot(0, 11);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        Assert.Equal(0, sim.BonusPoints[0]);
+        Assert.DoesNotContain(AudioCue.SfxBird, SimulationRunner.DrainCues(sim));
     }
 }
 
