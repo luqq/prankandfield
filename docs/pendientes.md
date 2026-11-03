@@ -30,8 +30,9 @@ Lo que quedaba abierto al cerrar la primera etapa del online (26/10/2026). Nada 
 - [ ] Récords online persistentes o una tabla global.
 - [ ] Rollback (predicción y re-simulación) si el retardo de 4 ticks se nota en conexiones lentas.
 - [ ] Emparejamiento público (sin código) o espectadores.
-- [ ] Más de 2 jugadores: exige cambiar los arrays fijos de 2 en `Game`, `EventSimulation` y
-      `FieldEventSimulation`.
+- [ ] Más de 2 jugadores: exige cambiar los arrays fijos de 2 en `Game`, `EventSimulation`,
+      `FieldEventSimulation`, `TurnEventSimulation` y las pruebas de Hyper Sports (`SwimmingSimulation`,
+      `SkeetSimulation`, `WeightliftingSimulation`).
 - [ ] Online en el host de escritorio (habría que comprobar que `Math.Sin/Cos` dan lo mismo que en WASM).
 
 ## Hyper Sports (modo añadido el 27/10/2026, online el 3/11/2026)

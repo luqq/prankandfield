@@ -1,8 +1,9 @@
 # Arquitectura del multijugador online
 
-Estado a 3/11/2026: funcionando en producción, 1 contra 1, salas privadas por código. Todo está en `main`.
-Desde el 3/11 la sala lleva el **juego** (Prank & Field o Hyper Sports): lo elige quien la crea y el servidor se
-lo comunica a los dos.
+Estado a 3/11/2026: el online 1 contra 1 con salas privadas por código funciona en producción y está en `main`.
+Con el PR de Hyper Sports la sala lleva además el **juego** (Prank & Field o Hyper Sports): lo elige quien la
+crea y el servidor se lo comunica a los dos. Hasta que se fusione y se actualice la imagen del servidor de la VM
+(ver [pendientes](pendientes.md)), el juego publicado solo juega Prank & Field online.
 
 ## Idea general
 
@@ -86,8 +87,10 @@ distintas durante un rato. Reglas que se han seguido al añadir el juego a la sa
   el aviso `online.mode_unsupported` en vez de empezar una partida que se desincronizaría. El servidor viejo
   responde «Method does not exist» al no poder enlazar los argumentos de un método que no tiene
   (`RelayClient.IsUnknownHubMethod`, con test en `RelayTests`).
-- Juego viejo + servidor nuevo: si el servidor anuncia un modo que el juego no conoce, el invitado ve
-  `online.game_outdated` (recargar la página) en vez de jugar otra cosa.
+- Juego viejo (anterior a los modos) + servidor nuevo: el cliente viejo ignora `mode` y juega Prank & Field;
+  si la sala es de Hyper Sports los dos juegan cosas distintas y el checksum lo detecta en el primer segundo
+  (ese cliente no tiene ningún aviso, de ahí el módulo JS versionado). `online.game_outdated` (recargar la
+  página) solo lo mostrará este juego si un servidor futuro anuncia un modo que no conoce.
 - Dos clientes de versiones distintas en la misma sala se detectan por el checksum, como cualquier otra
   divergencia; el módulo JS versionado (`prankandfield.js?v=`) reduce ese caso a una recarga.
 

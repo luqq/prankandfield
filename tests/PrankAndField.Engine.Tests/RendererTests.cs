@@ -32,7 +32,19 @@ public class RendererTests
                 case Op.FillEllipse: Coord(buf[i + 1]); Coord(buf[i + 2]); i += 5; break;
                 case Op.Line: for (int k = 1; k <= 5; k++) Coord(buf[i + k]); i += 6; break;
                 case Op.Polyline: { int n = (int)buf[i + 2]; for (int k = 0; k < 2 * n; k++) Coord(buf[i + 3 + k]); i += 3 + 2 * n; break; }
-                case Op.Text: { int n = (int)buf[i + 5]; Coord(buf[i + 1]); Coord(buf[i + 2]); i += 6 + n; break; }
+                case Op.Text:
+                    {
+                        int n = (int)buf[i + 5];
+                        Coord(buf[i + 1]);
+                        Coord(buf[i + 2]);
+                        // a key missing from the JSON files is drawn as "[key]": every screen walk catches it
+                        var chars = new char[n];
+                        for (int k = 0; k < n; k++) chars[k] = (char)buf[i + 6 + k];
+                        string text = new(chars);
+                        Assert.False(n >= 2 && text[0] == '[' && text[^1] == ']', $"untranslated key {text}");
+                        i += 6 + n;
+                        break;
+                    }
                 case Op.ClipPush: i += 5; break;
                 case Op.ClipPop: i += 1; break;
                 case Op.AudioSection: { int n = (int)buf[i + 1]; i += 2 + 3 * n; break; }

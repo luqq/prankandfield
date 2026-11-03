@@ -122,15 +122,22 @@ public class SkeetTests
     public void FiringAtNothingBreaksTheStreak()
     {
         var sim = New();
-        int ticks = 0;
+        int ticks = 0, shots = 0, hits = 0, maxStreak = 0;
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             ticks++;
+            maxStreak = Math.Max(maxStreak, sim.Streak);
+            // the last shot missed: the streak is gone
+            if (sim.Shots > shots && sim.Hits == hits) Assert.Equal(0, sim.Streak);
+            shots = sim.Shots;
+            hits = sim.Hits;
             // fire the left gun every 20 ticks, whatever is in the air
             return (new InputFrame(Run1: ticks % 20 == 0), InputFrame.None);
         });
         Assert.True(sim.Shots > 20, $"shots {sim.Shots}");
         Assert.True(sim.Hits < Rules.SkeetTargets);
+        Assert.True(sim.Hits > 0, "some left-house clays are hit by chance");
+        Assert.True(maxStreak < Rules.SkeetStreakBonusEvery, $"streak {maxStreak}: wasted shots between clays keep it short");
     }
 
     [Fact]
@@ -179,6 +186,94 @@ public class SkeetTests
         var h = new StateHash();
         sim.AddChecksum(ref h);
         return h.Value;
+    }
+
+
+    [Fact]
+    public void FromTheEleventhClayTwoLeaveTogether()
+    {
+        var sim = New();
+        var none = new ButtonEdges();
+        int before = 0;
+        for (int i = 0; i < 60 * 90 && !sim.IsFinished && sim.Launched < Rules.SkeetTargets; i++)
+        {
+            sim.Tick(Game.TickSeconds, none, none);
+            int launched = sim.Launched;
+            if (launched == before) continue;
+            if (launched < Rules.SkeetDoublesFrom) Assert.Equal(1, launched - before);
+            else
+            {
+                Assert.Equal(2, launched - before);
+                var pair = sim.Targets.Where(t => t.Index > before).ToList();
+                Assert.Equal(2, pair.Count);
+                Assert.NotEqual(pair[0].Side, pair[1].Side);
+            }
+            before = launched;
+        }
+        Assert.Equal(Rules.SkeetTargets, sim.Launched);
+    }
+
+    [Fact]
+    public void GoldenClaysAndStreaksPayTheirBonuses()
+    {
+        // a shooter that fires the gun whose sight holds a clay, so nearly every clay breaks
+        var sim = New();
+        var e = new ButtonEdges();
+        var none = new ButtonEdges();
+        long paid = 0;
+        int hits = 0, goldenHits = 0, streakBonuses = 0;
+        for (int i = 0; i < 60 * 90 && !sim.IsFinished; i++)
+        {
+            e.Update(new InputFrame(Run1: sim.TargetInSight(0), Run2: sim.TargetInSight(1)));
+            int streakBefore = sim.Streak, shotsBefore = sim.Shots;
+            sim.Tick(Game.TickSeconds, e, none);
+            // a double can break two clays in one tick; a broken clay stays in the list until the next tick
+            var broken = sim.Targets.Where(t => t.Hit).ToList();
+            Assert.Equal(hits + broken.Count, sim.Hits);
+            hits = sim.Hits;
+            foreach (var clay in broken) Assert.Equal(clay.Index % Rules.SkeetGoldenEvery == 0, clay.Golden);
+            bool cleanTick = sim.Shots - shotsBefore == broken.Count && sim.Streak == streakBefore + broken.Count;
+            if (cleanTick)
+            {
+                // every shot of the tick hit and nothing flew away: the bonuses are exactly predictable
+                long expected = broken.Count(c => c.Golden) * Rules.BonusPoints;
+                for (int st = streakBefore + 1; st <= sim.Streak; st++)
+                {
+                    if (st % Rules.SkeetStreakBonusEvery == 0) { expected += Rules.SkeetStreakBonus; streakBonuses++; }
+                }
+                Assert.Equal(expected, sim.BonusPoints[0] - paid);
+                goldenHits += broken.Count(c => c.Golden);
+            }
+            paid = sim.BonusPoints[0];
+            if (sim.Phase == TurnPhase.Result) break; // the last clays stay in the list once the turn is over
+        }
+        Assert.Equal(TurnPhase.Result, sim.Phase);
+        Assert.Equal(Rules.SkeetTargets, sim.Launched);
+        Assert.True(sim.Hits >= 18, $"hits {sim.Hits}");
+        Assert.True(goldenHits >= 1, "a golden clay was hit");
+        Assert.True(streakBonuses >= 1, "a streak of five was paid");
+    }
+
+    [Fact]
+    public void TheActionButtonFiresTheGunWithAClayInItsSight()
+    {
+        var sim = New();
+        var e = new ButtonEdges();
+        var none = new ButtonEdges();
+        bool leftChecked = false, rightChecked = false;
+        for (int i = 0; i < 60 * 90 && !sim.IsFinished; i++)
+        {
+            bool left = sim.TargetInSight(0), right = sim.TargetInSight(1);
+            bool press = left != right;
+            int hits = sim.Hits;
+            e.Update(new InputFrame(Action: press));
+            sim.Tick(Game.TickSeconds, e, none);
+            if (!press || sim.Hits != hits + 1) continue;
+            Assert.Equal(right ? 1 : -1, sim.Facing);
+            if (right) rightChecked = true;
+            else leftChecked = true;
+        }
+        Assert.True(leftChecked && rightChecked, $"left {leftChecked} right {rightChecked}");
     }
 
 }
@@ -301,6 +396,52 @@ public class ArcheryTests
         Assert.Equal(0, Rules.ArcheryPoints(1.2));
         Assert.Equal(Rules.ArcheryTargetRadius, 10 * Rules.ArcheryRing, 9);
     }
+
+    [Fact]
+    public void TheWindLiftsOrDropsTheArrow()
+    {
+        (double Angle, double Height)? up = null, down = null;
+        // small seeds all start the xorshift in the same corner, so the seeds are spread with a multiplier
+        for (uint k = 1; k < 400 && (up is null || down is null); k++)
+        {
+            var sim = New(2654435761u * k);
+            var none = new ButtonEdges();
+            while (sim.Phase != TurnPhase.Active) sim.Tick(Game.TickSeconds, none, none);
+            if (up is null && sim.Wind >= 0.5) up = ShootFlat(sim);
+            else if (down is null && sim.Wind <= -0.5) down = ShootFlat(sim);
+        }
+        Assert.True(up.HasValue && down.HasValue, "seeds with a strong wind either way");
+        Assert.Equal(up!.Value.Angle, down!.Value.Angle, 6);
+        double calm = Calm(up.Value.Angle);
+        Assert.True(up.Value.Height > calm + 0.15, $"up {up.Value.Height} calm {calm}");
+        Assert.True(down.Value.Height < calm - 0.15, $"down {down.Value.Height} calm {calm}");
+    }
+
+    /// <summary>Holds the button 20 ticks, releases, and returns the launch angle and the height at which the arrow reaches the target.</summary>
+    private static (double Angle, double Height) ShootFlat(ArcherySimulation sim)
+    {
+        var e = new ButtonEdges();
+        var none = new ButtonEdges();
+        for (int i = 0; i < 20; i++)
+        {
+            e.Update(new InputFrame(Action: true));
+            sim.Tick(Game.TickSeconds, e, none);
+        }
+        e.Update(InputFrame.None);
+        sim.Tick(Game.TickSeconds, e, none);
+        Assert.Equal(ArcheryState.Flight, sim.State);
+        double angle = sim.Angle;
+        while (sim.State == ArcheryState.Flight) sim.Tick(Game.TickSeconds, none, none);
+        Assert.Equal(sim.TargetX, sim.ArrowX);
+        return (angle, sim.ArrowY);
+    }
+
+    private static double Calm(double angleDeg)
+    {
+        double rad = angleDeg * Math.PI / 180.0, x = Rules.ArcheryTargetX, v = Rules.ArrowSpeed;
+        return Rules.ArcheryBowHeight + x * Math.Tan(rad) - Ballistics.G * x * x / (2 * v * v * Math.Cos(rad) * Math.Cos(rad));
+    }
+
 }
 
 public class TripleJumpTests
@@ -313,9 +454,11 @@ public class TripleJumpTests
         var sim = New();
         var bot = new Bot(0, 11);
         var phases = new List<int>();
+        int lateInAnyTry = 0;
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             if (sim.State == TripleJumpState.Flight && (phases.Count == 0 || phases[^1] != sim.JumpPhase)) phases.Add(sim.JumpPhase);
+            lateInAnyTry = Math.Max(lateInAnyTry, sim.LateTakeoffs);
             return (bot.NextForSimulation(s), InputFrame.None);
         });
         Assert.True(sim.IsFinished);
@@ -323,7 +466,7 @@ public class TripleJumpTests
         var mark = sim.MarkFor(0);
         Assert.True(mark is > 13 and < 19, $"mark {mark}");
         Assert.True(sim.DidQualify(0));
-        Assert.Equal(0, sim.LateTakeoffs);
+        Assert.Equal(0, lateInAnyTry);
     }
 
     [Fact]
@@ -399,12 +542,15 @@ public class WeightliftingTests
         var sim = New();
         var bot = new Bot(0, 11);
         var weights = new List<double>();
+        int lights = -1;
         SimulationRunner.RunUntilFinished(sim, s =>
         {
             if (sim.Phase == AttemptPhase.Active && (weights.Count == 0 || weights[^1] != sim.Weight)) weights.Add(sim.Weight);
+            if (sim.State == LiftState.Lifted) lights = sim.Lights;
             return (bot.NextForSimulation(s), InputFrame.None);
         });
         Assert.True(sim.IsFinished);
+        Assert.Equal(3, lights);
         double q = Rules.QualifyingMark(EventKind.Weightlifting, 1);
         Assert.Equal([q, q + Rules.WeightStep, q + 2 * Rules.WeightStep], weights);
         Assert.Equal(q + 2 * Rules.WeightStep, sim.MarkFor(0));
@@ -422,6 +568,7 @@ public class WeightliftingTests
         SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s) with { Action = false }, InputFrame.None));
         Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
         Assert.Null(sim.MarkFor(0));
+        Assert.Equal(0, sim.Lights);
         Assert.DoesNotContain(AudioCue.SfxLights, SimulationRunner.DrainCues(sim));
     }
 
@@ -667,6 +814,20 @@ public class HyperSportsGameTests
     [Fact]
     public void ModeIsPartOfTheChecksum()
     {
+        // Through the menu the mode always changes together with the selection and the first event, so to
+        // prove the mode itself is hashed it is set alone on an otherwise identical game.
+        var a = new Game(seed: 1);
+        var b = new Game(seed: 1);
+        Assert.Equal(a.Checksum(), b.Checksum());
+        var mode = typeof(Game).GetProperty(nameof(Game.Mode))!;
+        mode.SetValue(b, GameMode.HyperSports);
+        Assert.Equal(GameMode.HyperSports, b.Mode);
+        Assert.NotEqual(a.Checksum(), b.Checksum());
+    }
+
+    [Fact]
+    public void DifferentMenuChoicesGiveDifferentChecksums()
+    {
         var a = new Game(seed: 1);
         var b = new Game(seed: 1);
         Press(b, new InputFrame(Down: true));
@@ -704,7 +865,7 @@ public class HyperSportsRecordsTests
     {
         var old = new WorldRecords();
         old.Submit(EventKind.Dash100m, 9.50, "OLD");
-        // serialize only the first six rows, like the boards saved before Hyper Sports existed
+        // a full twelve-row round trip first; the six-row board of the old saves comes next
         string json = old.ToJson();
         var r = new WorldRecords();
         Assert.True(r.TryLoadJson(json));
