@@ -189,6 +189,7 @@ public sealed class GameHost
                     snapshot["sub"] = jv.State.ToString();
                     snapshot["try"] = jv.CurrentTry;
                     snapshot["line"] = jv.LineX;
+                    snapshot["angle"] = Math.Round(jv.State == Core.Events.ThrowState.WindUp ? jv.Angle : jv.ReleaseAngle, 1);
                     break;
                 case Core.Events.HammerSimulation hm:
                     snapshot["phase"] = hm.Phase.ToString();

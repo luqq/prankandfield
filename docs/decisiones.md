@@ -19,6 +19,7 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | Crédito | «Diseñado y desarrollado por Hiryu Soft» con un logo de dragón, pequeño a la derecha | Petición del usuario |
 | Ramas | Todo en `main`; el usuario fusiona los PR a mano | Se probó a aislar el online en `main-online` y luego se decidió unificar |
 | Martillo | Giro continuo: la velocidad angular crece sin saltos y el lanzador se dibuja como figura 3D proyectada (`SpinnerSprite`) que gira con la bola; la órbita de la bola es inclinada (baja delante, alta detrás). Lanzamiento con **una sola pulsación**: no hay ángulo que mantener; la distancia sale de las vueltas (fraccionarias) y de lo centrado del lanzamiento (`Rules.HammerDistance`, `HammerDirectionFactor`) | Antes el atleta solo alternaba entre dos encaramientos (cuatro posturas con la bola delante/detrás) y la mecánica de pulsar detrás / soltar delante era difícil de leer. Petición del usuario (27/10) |
+| Jabalina | Simplificada el 03/11: se pulsa lanzar antes de la línea y se mantiene; un dial sube de 20 a 70 grados a 60 grados por segundo y la jabalina sale al soltar, o sola al llegar al tope (`Rules.JavelinAngleStart`, `JavelinAngleMax`, `JavelinAngleRate`). El óptimo es 45 y los extremos del dial tiran lo mismo. La marca queda fijada al soltar: se quitó el bonus por mantener correr en vuelo y, a cambio, el factor de alcance sube de 2,3 a 2,5 (`Rules.JavelinRangeFactor`) para que las rondas altas no se endurezcan. El pájaro se alcanza con una carrera rápida y el botón mantenido hasta el tope del dial | Antes el ángulo subía de 0 a 90 a 150 grados por segundo (45 grados en tres décimas), se aparcaba en 90 si te pasabas y había que mantener correr en vuelo para el +20 %: tres cosas que cronometrar. Petición del usuario (27/10) |
 | Salto de altura | Rehecho el 27/10: carrera manual con los botones de correr, zona de batida pintada antes del listón (línea blanca = altura máxima), ángulo que sube desde 30 al mantener saltar (óptimo ~75), vértice del salto siempre sobre el listón si se bate dentro de la zona, listón que sube 4 cm tras cada salto válido | La versión anterior era injugable: carrera automática, ángulo que bajaba desde 80 y una ventana de batida de una décima de segundo; además pedía pulsar correr en el aire a 14 pulsaciones por segundo |
 
 ## Historia del online (PRs de `luqq/prankandfield`)
@@ -37,8 +38,9 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #10 | 25/10 | Longitud: caer antes de la arena (`Rules.LongJumpPitStart` = 1 m tras la tabla) es nulo. Jabalina: el atleta se planta al pulsar lanzar y la marca se mide desde la línea de nulo |
 | #12 | 27/10 | Martillo: giro continuo con el lanzador en 3D proyectado (`SpinnerSprite`), órbita inclinada y arco rojo de lanzamiento; se suelta con una sola pulsación, sin ángulo |
 | #13 | 27/10 | Salto de altura rehecho: carrera manual, zona de batida pintada antes del listón, ángulo que sube al mantener saltar y listón que sube 4 cm tras cada salto válido |
+| #15 | 27/10 | Barra de velocidad para cada corredor en las series de dos jugadores |
 
-Todos están fusionados en `main` salvo el #13, abierto el 27/10 (comprobado el 27/10/2026).
+Todos están fusionados en `main` salvo el #3, cerrado sin fusionar (comprobado el 03/11/2026). Siguen abiertos, y no figuran aquí hasta fusionarse, el #14 (gráficos) y el #16 (modo Hyper Sports).
 
 ## Ramas y repos retirados
 
