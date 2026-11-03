@@ -3,14 +3,15 @@ namespace PrankAndField.Core.Events;
 public enum ThrowState
 {
     Approach,
-    WindUp,     // button held, angle counting up, athlete planted where he pressed
+    WindUp,     // button held, the dial climbing from 20 to 70, athlete planted where he pressed
     Flight,
     Landed,
 }
 
 /// <summary>
-/// Javelin throw: approach, press to plant and hold to set the angle, release. The mark is measured
-/// from the foul line, so planting early costs distance.
+/// Javelin throw: run up, press THROW before the line to plant the feet, hold while the angle dial climbs
+/// and release to throw; the dial topping out throws by itself. The mark is measured from the foul line,
+/// so planting early costs distance, and it is fixed at the release: nothing done in flight changes it.
 /// </summary>
 public sealed class JavelinSimulation : FieldEventSimulation
 {
@@ -20,7 +21,7 @@ public sealed class JavelinSimulation : FieldEventSimulation
     private double _launchX;
     private double _runUpSpeed;
     private double _flightLength;
-    private double _holdSeconds;
+    private double _releaseTimer;
     private bool _foul;
     private bool _birdHit;
 
@@ -39,10 +40,13 @@ public sealed class JavelinSimulation : FieldEventSimulation
     public double JavelinY { get; private set; }
     public double JavelinAngle { get; private set; }
     public bool JavelinVisible { get; private set; }
-    /// <summary>Mark of the throw in progress: metres from the foul line to where the javelin is (or will land).</summary>
+    /// <summary>Mark of the throw in progress: metres from the foul line to where the javelin is going to land.</summary>
     public double Distance { get; private set; }
     public double ApexHeight { get; private set; }
     public bool BirdHit => _birdHit;
+
+    /// <summary>Angle the javelin left the hand at (degrees), once released.</summary>
+    public double ReleaseAngle { get; private set; }
 
     public override double? FlightHeight => State == ThrowState.Flight ? Math.Clamp((JavelinY - 1.8) / Math.Max(1, ApexHeight), 0, 1) : null;
 
@@ -51,9 +55,9 @@ public sealed class JavelinSimulation : FieldEventSimulation
         State = ThrowState.Approach;
         ShowAngle = false;
         Angle = 0;
+        ReleaseAngle = 0;
         _foul = false;
         _birdHit = false;
-        _holdSeconds = 0;
         JavelinVisible = false;
         Distance = 0;
     }
@@ -75,34 +79,32 @@ public sealed class JavelinSimulation : FieldEventSimulation
                     a.Runner.SpeedCm = 0;
                     State = ThrowState.WindUp;
                     ShowAngle = true;
-                    Angle = 0;
+                    Angle = Rules.JavelinAngleStart;
                     a.Pose = Pose.Throw;
                 }
                 break;
 
             case ThrowState.WindUp:
                 a.Pose = Pose.Throw;
-                // The angle climbs while the button is held and parks at 90; the throw happens on release.
-                Angle = Math.Min(90, Angle + Rules.JavelinAngleRate * dt);
-                if (!e.ActionHeld) Release(a);
+                // The dial climbs while the button is held. Letting go throws at the angle reached; the dial
+                // reaching the top throws by itself, so holding too long costs distance but never the attempt.
+                // A release on the very tick the dial tops out is the same 70-degree throw.
+                Angle = Math.Min(Rules.JavelinAngleMax, Angle + Rules.JavelinAngleRate * dt);
+                if (!e.ActionHeld || Angle >= Rules.JavelinAngleMax - 1e-9) Release(a);
                 break;
 
             case ThrowState.Flight:
                 {
-                    // The thrower plants his feet at the release point and watches the javelin fly.
+                    // The thrower stays planted at the release point and watches the javelin fly.
                     _releaseTimer -= dt;
                     a.Pose = _releaseTimer > 0 ? Pose.Release : Pose.Idle;
-                    if (e.Current.AnyRun) _holdSeconds += dt;
 
                     _flightTime += dt;
                     double t = Math.Min(_flightTime, _flightDuration);
                     double p = _flightDuration > 0 ? t / _flightDuration : 1;
-                    double holdBonus = 1 + Rules.JavelinRunHoldBonus * Math.Min(1, _holdSeconds / Math.Max(0.1, _flightDuration));
-                    _flightLength = _baseDistance * holdBonus;
-                    Distance = _launchX + _flightLength - LineX;
                     JavelinX = _launchX + _flightLength * p;
                     JavelinY = 1.8 + 4 * ApexHeight * p * (1 - p);
-                    JavelinAngle = Angle * (1 - 2 * p); // nose up then down
+                    JavelinAngle = ReleaseAngle * (1 - 2 * p); // nose up then down
                     if (!_birdHit && JavelinY > Rules.JavelinBirdApex && p < 0.5)
                     {
                         _birdHit = true;
@@ -122,21 +124,18 @@ public sealed class JavelinSimulation : FieldEventSimulation
         }
     }
 
-    private double _baseDistance;
-    private double _releaseTimer;
-
     private void Release(Athlete a)
     {
         State = ThrowState.Flight;
+        ReleaseAngle = Angle;
         _flightTime = 0;
         _releaseTimer = 0.6;
         _launchSpeed = Rules.JavelinLaunchSpeed(_runUpSpeed);
         _launchX = a.X;
-        _baseDistance = Rules.JavelinDistance(_launchSpeed, Angle);
-        _flightLength = _baseDistance;
+        _flightLength = Rules.JavelinDistance(_launchSpeed, ReleaseAngle);
         Distance = _launchX + _flightLength - LineX;
-        ApexHeight = Math.Max(2, Ballistics.PeakHeight(_launchSpeed, Angle) * 1.4);
-        _flightDuration = 1.2 + 0.025 * _baseDistance + ApexHeight * 0.03;
+        ApexHeight = Math.Max(2, Ballistics.PeakHeight(_launchSpeed, ReleaseAngle) * 1.4);
+        _flightDuration = 1.2 + 0.025 * _flightLength + ApexHeight * 0.03;
         JavelinVisible = true;
         JavelinX = _launchX;
         JavelinY = 1.8;

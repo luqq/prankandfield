@@ -35,6 +35,9 @@ public sealed class Bot
     /// <summary>High jump: the bot lets go of the button once the meter reaches this angle.</summary>
     public double HighJumpAngle { get; set; } = 75;
 
+    /// <summary>Javelin: the bot lets go of the button once the dial reaches this angle (above 70 it waits for the auto-throw).</summary>
+    public double JavelinAngle { get; set; } = Rules.JavelinBestAngle;
+
     /// <summary>Taps per second in the air during a vault (each alternated tap is half a twist).</summary>
     public double TwistTaps { get; set; } = 8;
 
@@ -130,8 +133,7 @@ public sealed class Bot
                     if (a!.X >= jv.LineX - TakeoffMargin) action = true;
                     else run = Tap(dt);
                 }
-                else if (jv.State == ThrowState.WindUp) action = jv.Angle < 42;
-                else if (jv.State == ThrowState.Flight) run = true; // hold RUN for the extra distance
+                else if (jv.State == ThrowState.WindUp) action = jv.Angle < JavelinAngle;
                 break;
             case HammerSimulation hm when hm.CurrentAthlete.PlayerIndex == _player && hm.Phase == AttemptPhase.Active:
                 if (hm.State == HammerState.Ready)
