@@ -93,6 +93,12 @@ public class JavelinTests
 {
     private static JavelinSimulation New(uint seed = 1) => new(1, [new Athlete(0, false, "AAA")], new Rng(seed));
 
+    /// <summary>
+    /// The bot keeps the button held while the dial is under its <see cref="Bot.JavelinAngle"/> and lets go on the
+    /// following tick, so this target makes the javelin leave at exactly <paramref name="angle"/> (a dial value).
+    /// </summary>
+    private static double LetGoAt(double angle) => angle - Rules.JavelinAngleRate * Game.TickSeconds - 1e-6;
+
     /// <summary>Runs the first try with the bot and returns the angle the javelin left the hand at.</summary>
     private static double ReleaseAngleOfFirstTry(Bot bot, JavelinSimulation sim, Func<InputFrame, JavelinSimulation, InputFrame>? tweak = null)
     {
@@ -123,12 +129,76 @@ public class JavelinTests
     [Fact]
     public void AModestRunUpReleasedNearTheBestAngleClearsTheFirstStandard()
     {
-        // About 7 taps a second is a comfortable keyboard rhythm: it clears round 1 (60 m) and round 2 (70 m), not round 3.
+        // About 7 taps a second is a comfortable keyboard rhythm: at the best angle it clears round 1 (60 m), not round 2 (70 m).
+        // The bot plants right after a tap; a run-up planted between taps carries less speed (see the ladder below).
         var sim = New();
         var bot = new Bot(0, 7);
         SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
-        Assert.True(sim.MarkFor(0) is >= 70 and < 80, $"mark {sim.MarkFor(0)}");
+        Assert.True(sim.MarkFor(0) is >= 60 and < 70, $"mark {sim.MarkFor(0)}");
         Assert.True(sim.DidQualify(0));
+    }
+
+    // Bot marks with a good plant (0.6 m before the line, just after a tap). The run-up speed kept at the plant
+    // depends on where it falls between two taps, so a player at the same rhythm can throw up to ~9 m less.
+    [Theory]
+    [InlineData(6, 0)]  // a jog: ~50 m, out in round 1
+    [InlineData(7, 1)]  // ~64 m
+    [InlineData(8, 2)]  // ~72 m
+    [InlineData(9, 3)]  // ~81 m
+    [InlineData(10, 4)] // ~89 m
+    public void EveryRoundNeedsAboutOneMoreTapPerSecond(double tapsPerSecond, int roundsCleared)
+    {
+        var sim = New();
+        var bot = new Bot(0, tapsPerSecond);
+        SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+        double mark = sim.MarkFor(0)!.Value;
+        int cleared = 0;
+        for (int round = 1; round <= Rules.MaxRound; round++)
+            if (Rules.Qualifies(EventKind.JavelinThrow, round, mark)) cleared = round;
+        Assert.Equal(roundsCleared, cleared);
+    }
+
+    [Fact]
+    public void TheRecordNeedsAFranticRunUpAtTheBestAngle()
+    {
+        double MarkAt(double tapsPerSecond)
+        {
+            var sim = New();
+            var bot = new Bot(0, tapsPerSecond);
+            SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
+            return sim.MarkFor(0)!.Value;
+        }
+        double record = new WorldRecords().Best(EventKind.JavelinThrow).Mark; // 99.72
+        Assert.True(MarkAt(11) < record, "11 taps a second is not a record"); // ~98 m
+        Assert.True(MarkAt(13) > record, "13 taps a second is");            // ~109 m
+    }
+
+    [Fact]
+    public void AModestRunUpNeedsTheAngleWithinAFewDegreesOfTheBest()
+    {
+        double MarkAt(double angle)
+        {
+            var sim = New();
+            var bot = new Bot(0, 7) { JavelinAngle = LetGoAt(angle) };
+            Assert.Equal(angle, ReleaseAngleOfFirstTry(bot, sim), 6);
+            return sim.AttemptsFor(0)[0].Mark!.Value;
+        }
+        Assert.True(Rules.Qualifies(EventKind.JavelinThrow, 1, MarkAt(40)), "five degrees under 45 still clears 60 m"); // ~62 m
+        Assert.True(Rules.Qualifies(EventKind.JavelinThrow, 1, MarkAt(50)), "five degrees over too");                  // ~62 m
+        Assert.False(Rules.Qualifies(EventKind.JavelinThrow, 1, MarkAt(35)), "ten degrees under does not");            // ~56 m
+        Assert.False(Rules.Qualifies(EventKind.JavelinThrow, 1, MarkAt(55)), "ten degrees over does not");             // ~56 m
+    }
+
+    [Fact]
+    public void TheDialReaches45InAThirdOfASecondAndShowsIt()
+    {
+        // 75 degrees a second is 1.25 a frame: 45 is one of the values the dial (and the angle box) goes through.
+        Assert.Equal(1.25, Rules.JavelinAngleRate * Game.TickSeconds, 9);
+        Assert.Equal(1.0 / 3.0, Rules.JavelinHoldFor(Rules.JavelinBestAngle), 9);
+        Assert.Equal(2.0 / 3.0, Rules.JavelinHoldFor(Rules.JavelinAngleMax), 9);
+        var sim = New();
+        var bot = new Bot(0, 11) { JavelinAngle = LetGoAt(Rules.JavelinBestAngle) };
+        Assert.Equal(Rules.JavelinBestAngle, ReleaseAngleOfFirstTry(bot, sim), 9);
     }
 
     [Fact]
@@ -153,7 +223,7 @@ public class JavelinTests
     }
 
     [Fact]
-    public void TheDialStartsAt20AndClimbs60DegreesPerSecond()
+    public void TheDialStartsAt20AndClimbs75DegreesPerSecond()
     {
         var sim = New();
         var bot = new Bot(0, 11) { JavelinAngle = 1000 }; // never lets go
@@ -192,7 +262,7 @@ public class JavelinTests
         Assert.Equal(Rules.JavelinAngleMax, angle, 6);
         Assert.InRange(windUpEnd - windUpStart, Rules.JavelinHoldFor(Rules.JavelinAngleMax) - 0.05, Rules.JavelinHoldFor(Rules.JavelinAngleMax) + 0.05);
         Assert.False(sim.AttemptsFor(0)[0].Foul);
-        Assert.InRange(sim.AttemptsFor(0)[0].Mark!.Value, 55, 75); // a legal throw, a third shorter than the ~100 m this run-up gets at 45
+        Assert.InRange(sim.AttemptsFor(0)[0].Mark!.Value, 25, 40); // a legal throw, a third of the ~98 m this run-up gets at 45
     }
 
     [Fact]
@@ -221,7 +291,7 @@ public class JavelinTests
         double angle = ReleaseAngleOfFirstTry(bot, sim);
         Assert.InRange(angle, Rules.JavelinAngleStart, Rules.JavelinAngleStart + Rules.JavelinAngleRate * Game.TickSeconds + 1e-9);
         Assert.False(sim.AttemptsFor(0)[0].Foul);
-        Assert.InRange(sim.AttemptsFor(0)[0].Mark!.Value, 55, 75); // a legal throw, a third shorter than the ~100 m this run-up gets at 45
+        Assert.InRange(sim.AttemptsFor(0)[0].Mark!.Value, 30, 45); // a legal throw, little more than a third of the ~98 m this run-up gets at 45
     }
 
     [Fact]
@@ -234,11 +304,11 @@ public class JavelinTests
             SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s), InputFrame.None));
             return sim.AttemptsFor(0)[0].Mark!.Value;
         }
-        double best = MarkAt(Rules.JavelinBestAngle); // ~100 m
-        double top = MarkAt(1000);                    // held until the dial throws by itself at 70: ~64 m
-        double tap = MarkAt(0);                       // let go at once, 21 degrees: ~67 m
-        Assert.True(top < 0.7 * best, $"top {top} best {best}");
-        Assert.True(tap < 0.7 * best, $"tap {tap} best {best}");
+        double best = MarkAt(Rules.JavelinBestAngle); // ~98 m
+        double top = MarkAt(1000);                    // held until the dial throws by itself at 70: ~31 m
+        double tap = MarkAt(0);                       // let go at once, 21.25 degrees: ~36 m
+        Assert.True(top < 0.4 * best, $"top {top} best {best}");
+        Assert.True(tap < 0.4 * best, $"tap {tap} best {best}");
         Assert.True(Math.Abs(top - tap) < 0.1 * best, $"top {top} tap {tap}"); // the dial is symmetric around the best angle
     }
 
@@ -250,9 +320,13 @@ public class JavelinTests
         for (double a = Rules.JavelinAngleStart; a <= Rules.JavelinAngleMax; a += 1)
             Assert.True(Rules.JavelinDistance(v, a) <= best + 1e-9, $"{a} degrees beats {Rules.JavelinBestAngle}");
         Assert.Equal(Rules.JavelinDistance(v, Rules.JavelinAngleStart), Rules.JavelinDistance(v, Rules.JavelinAngleMax), 6);
-        // ten degrees either side of the best angle still gives 94 % of the throw
-        Assert.True(Rules.JavelinDistance(v, Rules.JavelinBestAngle - 10) > 0.93 * best);
-        Assert.True(Rules.JavelinDistance(v, Rules.JavelinBestAngle + 10) > 0.93 * best);
+        // five degrees either side of the best angle still gives 96 % of the throw, ten degrees 86 %, the ends of the dial a third
+        Assert.InRange(Rules.JavelinDistance(v, Rules.JavelinBestAngle - 5) / best, 0.95, 0.98);
+        Assert.InRange(Rules.JavelinDistance(v, Rules.JavelinBestAngle + 5) / best, 0.95, 0.98);
+        Assert.InRange(Rules.JavelinDistance(v, Rules.JavelinBestAngle - 10) / best, 0.84, 0.89);
+        Assert.InRange(Rules.JavelinDistance(v, Rules.JavelinBestAngle + 10) / best, 0.84, 0.89);
+        Assert.InRange(Rules.JavelinDistance(v, Rules.JavelinAngleStart) / best, 0.28, 0.35);
+        Assert.InRange(Rules.JavelinDistance(v, Rules.JavelinAngleMax) / best, 0.28, 0.35);
     }
 
     [Fact]
