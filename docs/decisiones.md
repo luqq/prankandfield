@@ -53,8 +53,9 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #18 | 3/11 | Jabalina simplificada: dial de 20 a 70 grados a 60 grados por segundo que lanza solo al llegar al tope; marca fijada al soltar, sin bonus por mantener correr en vuelo |
 | #19 | 3/11 | Mejora gráfica rehecha en estilo arcade plano de 1983 (ver Estética): público animado, marcador y vallas publicitarias, campos detallados, partículas de píxel, cielo del título, ceremonia y botón CRT de líneas de barrido, todo con colores lisos y opacos; incluye las seis pruebas de Hyper Sports en el mismo estilo |
 | #20 | 3/11 | Botonera táctil: INICIO · SALTAR/LANZAR · CORRER · CORRER, con los dos de correr juntos a la derecha del de saltar |
+| #21 | 3/11 | Carrera automática en el potro y el salto de altura: una pulsación de correr y el atleta corre solo a velocidad fija, como en los arcades originales |
 
-Todos están fusionados en `main` salvo el #3 y el #14, cerrados sin fusionar (comprobado el 3/11/2026 tras fusionar el #20).
+Todos están fusionados en `main` salvo el #3 y el #14, cerrados sin fusionar, y el #21, abierto el 3/11 (comprobado el 3/11/2026 tras fusionar el #20).
 
 ## Ramas y repos retirados
 
