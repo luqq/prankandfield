@@ -72,7 +72,7 @@
   "event.weightlifting": "HALTEROFILIA",
   "instr.dash100": "ALTERNA LOS BOTONES DE CORRER TRAS EL DISPARO",
   "instr.longjump": "CORRE, PULSA SALTAR ANTES DE LA TABLA, MANTÉN PARA SUBIR EL ÁNGULO",
-  "instr.javelin": "CORRE, MANTÉN LANZAR PARA FIJAR EL ÁNGULO, SUELTA ANTES DE LA LÍNEA",
+  "instr.javelin": "CORRE, PULSA LANZAR ANTES DE LA LÍNEA Y MANTÉN: EL ÁNGULO SUBE DESDE 20, SUELTA HACIA LOS 45 GRADOS",
   "instr.hurdles110": "CORRE Y PULSA SALTAR JUSTO ANTES DE CADA VALLA",
   "instr.hammer": "PULSA CORRER PARA GIRAR. PULSA LANZAR CUANDO LA BOLA ESTÉ ROJA DELANTE DE TI. MÁS VUELTAS, MÁS LEJOS",
   "instr.highjump": "CORRE, PULSA SALTAR DENTRO DE LA ZONA, MANTÉN PARA FIJAR EL ÁNGULO: UNOS 75 GRADOS ES LO MEJOR",
@@ -155,5 +155,8 @@
   "touch.run": "CORRER",
   "touch.action": "SALTAR / LANZAR",
   "touch.start": "INICIO",
+  "stadium.ad_cup": "COPA VECTOR",
+  "crt.button": "CRT",
+  "crt.tooltip": "Líneas de barrido CRT",
   "credit.by": "Diseñado y desarrollado por {0}"
 }

@@ -7,7 +7,7 @@ using PrankAndField.Engine.Sprites;
 
 namespace PrankAndField.Engine.Rendering;
 
-/// <summary>The red-framed scoreboard of the arcade and the in-field readouts (speed bar, angle box, banners).</summary>
+/// <summary>The red-framed scoreboard of the arcade and the in-field readouts (speed bar, angle gauge, banners).</summary>
 public static class Hud
 {
     /// <summary>The small unit label of a mark: SEC, M, PTS, HITS or KG.</summary>
@@ -59,6 +59,21 @@ public static class Hud
         dl.FillRect(x + w - t, y, t, h, border);
     }
 
+    /// <summary>A scoreboard panel: black fill with a one-pixel border.</summary>
+    private static void Panel(DrawList dl, double x, double y, double w, double h, Rgba border)
+    {
+        dl.FillRect(x, y, w, h, Palette.Black);
+        Box(dl, x, y, w, h, border);
+    }
+
+    /// <summary>Text over a solid black copy one pixel down and right (the arcade drop shadow), so it stays legible over scenery.</summary>
+    public static void ShadowText(DrawList dl, double x, double y, string text, Rgba color, double size, TextAlign align = TextAlign.Left)
+    {
+        double d = Math.Max(0.6, size * 0.6);
+        PixelFont.Draw(dl, x + d, y + d, text, Palette.Black, size, align);
+        PixelFont.Draw(dl, x, y, text, color, size, align);
+    }
+
     /// <summary>The top scoreboard: SCORE box, WORLD RECORD box, rank list, QUALIFY and the timer / tries.</summary>
     public static void DrawScoreboard(DrawList dl, Game game, double time)
     {
@@ -67,7 +82,7 @@ public static class Hud
         Box(dl, 2, 2, Screen.Width - 4, Layout.HudBottom - 4, Palette.HudFrame, 2);
 
         // --- SCORE box ---
-        Box(dl, 6, 7, 122, 31, Palette.HudCyan);
+        Panel(dl, 6, 7, 122, 31, Palette.HudCyan);
         dl.FillRect(44, 4, 44, 6, Palette.Black);
         PixelFont.Draw(dl, 66, 3.5, loc["hud.score"], Palette.White, 0.9, TextAlign.Center);
         for (int i = 0; i < game.PlayerCount; i++)
@@ -88,7 +103,7 @@ public static class Hud
         }
 
         // --- WORLD RECORD box ---
-        Box(dl, 132, 7, 118, 31, Palette.HudCyan);
+        Panel(dl, 132, 7, 118, 31, Palette.HudCyan);
         dl.FillRect(156, 4, 70, 6, Palette.Black);
         PixelFont.Draw(dl, 191, 3.5, loc["hud.world_record"], Palette.HudCyan, 0.9, TextAlign.Center);
         var records = game.Records.For(game.CurrentEvent);
@@ -101,6 +116,7 @@ public static class Hud
         }
 
         // --- lower rows ---
+        dl.FillRect(6, 39.2, Screen.Width - 12, 0.5, Palette.HudDim);
         DrawLowerRows(dl, game, time);
     }
 
@@ -108,9 +124,10 @@ public static class Hud
     {
         dl.FillCircle(cx, cy, 2.6, colors.Skin);
         dl.FillRect(cx - 2.4, cy - 2.6, 4.8, 1.4, colors.Hair);
+        dl.FillRect(cx - 2.4, cy - 1.3, 4.8, 0.6, colors.Accent);
         dl.FillRect(cx - 1.4, cy + 0.4, 2.8, 0.9, Palette.Mustache);
-        dl.FillRect(cx - 1.2, cy - 0.9, 0.7, 0.7, Palette.Black);
-        dl.FillRect(cx + 0.5, cy - 0.9, 0.7, 0.7, Palette.Black);
+        dl.FillRect(cx - 1.2, cy - 0.7, 0.7, 0.7, Palette.Black);
+        dl.FillRect(cx + 0.5, cy - 0.7, 0.7, 0.7, Palette.Black);
     }
 
     private static void DrawLowerRows(DrawList dl, Game game, double time)
@@ -169,7 +186,7 @@ public static class Hud
         if (sim is RaceSimulation r)
         {
             // timer box, inside the frame
-            Box(dl, 168, 47, 78, 14, Palette.HudCyan);
+            Panel(dl, 168, 47, 78, 14, Palette.HudCyan);
             var humans = r.Athletes.Where(a => !a.IsCpu).OrderBy(a => a.PlayerIndex).ToList();
             if (humans.Count == 1)
             {
@@ -193,6 +210,7 @@ public static class Hud
                 double y = y0 + (i + 1) * rowH;
                 bool current = field.CurrentTry == i + 1 && field.Phase != AttemptPhase.Finished;
                 var color = current ? Palette.HudYellow : Palette.White;
+                if (current) dl.FillRect(134, y - 0.8, 116, rowH, Palette.HudDim);
                 PixelFont.Draw(dl, 136, y, loc[$"hud.try{i + 1}"], color, small);
                 var at = tries[i];
                 if (at.Foul) PixelFont.Draw(dl, 192, y, loc["banner.foul"], Palette.HudRed, small);
@@ -238,6 +256,8 @@ public static class Hud
         var loc = game.Localizer;
         double top = Layout.StripATop + Layout.StripHeight;
         dl.FillRect(0, top, Screen.Width, Layout.BandHeight, Palette.Black);
+        dl.FillRect(0, top, Screen.Width, 0.6, Palette.HudDim);
+        dl.FillRect(0, top + Layout.BandHeight - 0.6, Screen.Width, 0.6, Palette.HudDim);
         int i = 0;
         foreach (var a in race.Athletes.OrderByDescending(x => x.PlayerIndex))
         {
@@ -247,6 +267,10 @@ public static class Hud
             string speed = ((int)Math.Round(a.Runner.SpeedCm)).ToString("0000", CultureInfo.InvariantCulture);
             PixelFont.Draw(dl, x + 30, top + 1.5, speed, Palette.White, 0.9);
             PixelFont.Draw(dl, x + 56, top + 2.5, loc["hud.cmsec"], Palette.HudYellow, 0.6);
+            // a tiny bar graph of the speed next to the number
+            double frac = Math.Clamp(a.Runner.SpeedCm / 1550.0, 0, 1);
+            dl.FillRect(x + 96, top + 2.5, 24, 5, Palette.HudUnlit);
+            dl.FillRect(x + 96, top + 2.5, 24 * frac, 5, Palette.HudYellow);
             i++;
         }
     }
@@ -261,6 +285,7 @@ public static class Hud
         var loc = game.Localizer;
         double top = Layout.BottomTop;
         dl.FillRect(0, top, Screen.Width, Screen.Height - top, Palette.Black);
+        dl.FillRect(0, top, Screen.Width, 0.8, Palette.HudFrame);
         string shown = title ?? loc["hud.speed"];
         PixelFont.Draw(dl, 4, top + 5, shown, Palette.White, 0.9);
         // the blocks start after the title, wherever it ends (AGUANTA= is wider than SPEED=)
@@ -280,6 +305,7 @@ public static class Hud
         var loc = game.Localizer;
         double top = Layout.BottomTop;
         dl.FillRect(0, top, Screen.Width, Screen.Height - top, Palette.Black);
+        dl.FillRect(0, top, Screen.Width, 0.8, Palette.HudFrame);
         PixelFont.Draw(dl, 4, top + 7.5, loc["hud.speed"], Palette.White, 0.9);
         for (int i = 0; i < runners.Count && i < 2; i++)
         {
@@ -298,7 +324,7 @@ public static class Hud
         int lit = (int)Math.Round(Math.Clamp(speedCm / maxCm, 0, 1) * 24);
         for (int i = 0; i < 24; i++)
         {
-            var c = i < lit ? (i < 16 ? Palette.HudYellow : Palette.HudBlue) : Palette.DarkGrey.Darker(0.5);
+            var c = i < lit ? (i < 16 ? Palette.HudYellow : Palette.HudBlue) : Palette.HudUnlit;
             dl.FillRect(x + i * 5.5, y, 4.5, h, c);
         }
     }
@@ -311,11 +337,20 @@ public static class Hud
         PixelFont.Draw(dl, right + 2, y + 1.5 * size, loc["hud.cmsec"], Palette.HudYellow, 0.6 * size);
     }
 
+    /// <summary>Angle readout: the number in degrees in a small cyan box, with a row of ticks lit up to the angle below it.</summary>
     public static void DrawAngleBox(DrawList dl, double cx, double y, double angle)
     {
-        dl.FillRect(cx - 14, y, 28, 11, Palette.Black);
-        Box(dl, cx - 14, y, 28, 11, Palette.HudCyan);
+        const double w = 28, h = 14;
+        dl.FillRect(cx - w / 2, y, w, h, Palette.Black);
+        Box(dl, cx - w / 2, y, w, h, Palette.HudCyan);
         PixelFont.Draw(dl, cx, y + 2, $"{(int)Math.Round(angle)}°", Palette.White, 1, TextAlign.Center);
+        // nine ticks for 0..90 degrees; the lit ones turn green around the 40-50 sweet spot
+        int lit = (int)Math.Round(Math.Clamp(angle, 0, 90) / 10.0);
+        for (int i = 0; i < 9; i++)
+        {
+            var c = i < lit ? (i is 3 or 4 ? Palette.HudGreen : Palette.HudYellow) : Palette.HudUnlit;
+            dl.FillRect(cx - w / 2 + 2.5 + i * 2.6, y + h - 3.2, 1.8, 1.6, c);
+        }
     }
 
     /// <summary>A small prompt above an athlete ("BREATHE!", "PRESS!") with an optional bar that shrinks as the window closes.</summary>
@@ -325,7 +360,7 @@ public static class Hud
         double w = PixelFont.Measure(text, size) + 8;
         double h = PixelFont.CellH * size + (windowLeft >= 0 ? 5 : 2);
         double x = Math.Clamp(cx - w / 2, 2, Screen.Width - w - 2);
-        dl.FillRect(x, y, w, h, Palette.Black.WithAlpha(210));
+        dl.FillRect(x, y, w, h, Palette.Black);
         Box(dl, x, y, w, h, color);
         PixelFont.Draw(dl, x + w / 2, y + 2, text, color, size, TextAlign.Center);
         if (windowLeft >= 0) dl.FillRect(x + 2, y + h - 3, (w - 4) * Math.Clamp(windowLeft, 0, 1), 1.6, color);
@@ -338,8 +373,9 @@ public static class Hud
     {
         double w = PixelFont.CanDraw(text) ? PixelFont.Measure(text, size) + 10 : text.Length * PixelFont.CellW * size + 10;
         double h = PixelFont.CellH * size + 4;
-        dl.FillRect(Screen.Width / 2 - w / 2, y - 2, w, h, Palette.Black.WithAlpha(200));
-        Box(dl, Screen.Width / 2 - w / 2, y - 2, w, h, color);
+        double x = Screen.Width / 2 - w / 2;
+        dl.FillRect(x, y - 2, w, h, Palette.Black);
+        Box(dl, x, y - 2, w, h, color);
         PixelFont.Draw(dl, Screen.Width / 2, y + 1, text, color, size, TextAlign.Center);
     }
 

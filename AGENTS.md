@@ -66,6 +66,11 @@ navegadores Chromium contra el servidor local y `?relay=`.
   una clave.
 - **Secretos**: nunca escribas en el repo, en issues, en PR ni en documentos el valor de `RELAY_KEY` ni de
   ningún token. `appsettings.json` del host web lleva `RelayKey` vacío a propósito.
+- **Estética arcade plana (1983)**: colores lisos y opacos, bordes duros, sprites de píxel. Nada de
+  degradados, brillos, sombras translúcidas, contornos de tinta ni efectos 3D en el renderizado; el
+  botón CRT solo pinta líneas de barrido. Un test del motor falla si un fotograma contiene un color
+  con transparencia. Motivo: el usuario rechazó la mejora gráfica del PR #14 porque quitaba el aspecto
+  retro (ver [docs/decisiones.md](docs/decisiones.md)).
 - Idioma: el usuario escribe en español; el código, los comentarios y el README están en inglés. Los
   documentos de `docs/` están en español.
 

@@ -185,6 +185,36 @@ public sealed class DrawList
         return arr;
     }
 
+    /// <summary>
+    /// Walks an encoded buffer and yields the opcode and the index of every command, up to the end marker.
+    /// Lets hosts and tests inspect a frame without decoding it by hand.
+    /// </summary>
+    public static IEnumerable<(double Op, int Index)> Walk(double[] a)
+    {
+        int i = 0;
+        while (i < a.Length)
+        {
+            double op = a[i];
+            if (op == Op.End) yield break;
+            yield return (op, i);
+            switch (op)
+            {
+                case Op.SetColor: i += 5; break;
+                case Op.FillRect: i += 5; break;
+                case Op.FillPoly: i += 2 + 2 * (int)a[i + 1]; break;
+                case Op.FillCircle: i += 4; break;
+                case Op.FillEllipse: i += 5; break;
+                case Op.Line: i += 6; break;
+                case Op.Polyline: i += 3 + 2 * (int)a[i + 2]; break;
+                case Op.Text: i += 6 + (int)a[i + 5]; break;
+                case Op.ClipPush: i += 5; break;
+                case Op.ClipPop: i += 1; break;
+                case Op.AudioSection: i += 2 + 3 * (int)a[i + 1]; break;
+                default: yield break;
+            }
+        }
+    }
+
     /// <summary>Decodes the buffer into readable commands (for tests and debugging).</summary>
     public IEnumerable<string> Describe()
     {

@@ -16,7 +16,7 @@ projects; the same Razor component runs in a browser (Blazor WebAssembly) and in
 | Project | Role |
 |---|---|
 | `src/PrankAndField.Core` | Game logic only: events, running/ballistics model, rules and qualifying table, scoring, world records (JSON persistence), the credit state machine and the localizer. No rendering, no audio playback. |
-| `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]`, a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache), stadium, HUD and all screens. Backend-agnostic. |
+| `src/PrankAndField.Engine` | Vector rendering engine: a retained `DrawList` encoded as a flat `double[]` (rects, polygons, circles, ellipses, lines, polylines, text, clips), a 5x7 pixel-style vector font (Latin + Spanish/Valencian accents, Japanese falls back to backend text), the athlete sprite (poses, run cycle, mustache), the animated stadium, HUD, all screens and the visual-only particle effects (`Fx`). Flat 1983 colours only: no gradients, glows or translucent shadows. Backend-agnostic. |
 | `src/PrankAndField.Audio` | Songs (notes + syllables), sound ids, voice lines and the cue mapping. Serialized to the JavaScript synthesizer. |
 | `src/PrankAndField.Net` | Online play: deterministic lockstep session (input delay, checksum exchange), wire messages and the transport abstraction, plus an in-memory link for local play and tests. |
 | `src/PrankAndField.Net.Client` | SignalR client of the relay: creates or joins a room and exposes the match as an `IGameTransport`. |
@@ -89,13 +89,16 @@ entries of the menu: **Prank & Field** or **Hyper Sports**, each for 1 or 2 play
 which always picks 2 players) begins the credit in the highlighted mode; the record ticker at the bottom shows
 the records of that mode.
 
+The **CRT** button in the toolbar adds scanlines over the canvas; the choice is remembered in
+the browser (`localStorage` key `paf.crt`). It is purely cosmetic and costs nothing in the simulation.
+
 ### Events (round-1 standards match the arcade)
 
 | Event | Technique | Qualify |
 |---|---|---|
 | 100 m dash | Alternate RUN after the gun. Pressing before it is a flying start; the third one loses the heat. | 16.00 s |
 | Long jump | Run, press JUMP before the board, hold to raise the angle (about 42-45 degrees is best). Past the board = FOUL. Take off within 3 cm of the board and a mole pays 1000. | 6.00 m |
-| Javelin | Run, hold THROW to raise the angle (you may keep tapping RUN), release before the line. Holding RUN in flight carries the javelin up to 20 % farther. A very steep, fast throw hits the bird. | 60.00 m |
+| Javelin | Run, press THROW before the line and keep it held: the thrower plants his feet and a dial climbs from 20 to 70 degrees at 60 degrees per second. Let go at about 45 for the longest throw; if the dial reaches 70 the javelin leaves by itself, so holding too long costs distance but never the try. The mark is measured from the line and fixed at the release. Past the line = FOUL. A fast run-up held to the top hits the bird. | 60.00 m |
 | 110 m hurdles | Run and press JUMP just before each hurdle. | 14.50 s |
 | Hammer | Press RUN once to spin; the turn accelerates smoothly and the athlete and the ball turn with it. Press THROW once when the ball glows red in front of you (over the red arc). Every turn adds distance: five turns reach the first standard, seven the last. Any release in the front half is legal but shorter off-centre; behind you is a foul. Ten turns make you dizzy. | 73.00 m |
 | High jump | Run up with the RUN buttons, press JUMP inside the zone painted before the bar (the white line is best), hold to raise the angle and release at about 75 degrees. Speed, angle and the take-off spot decide the height; inside the zone the apex is always over the bar. The bar rises 4 cm after every clearance and stays after a miss; running into the uprights is a miss too. Clear only on the third try after two misses for the mole. | 2.30 m |
