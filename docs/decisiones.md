@@ -38,10 +38,11 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #10 | 25/10 | Longitud: caer antes de la arena (`Rules.LongJumpPitStart` = 1 m tras la tabla) es nulo. Jabalina: el atleta se planta al pulsar lanzar y la marca se mide desde la línea de nulo |
 | #12 | 27/10 | Martillo: giro continuo con el lanzador en 3D proyectado (`SpinnerSprite`), órbita inclinada y arco rojo de lanzamiento; se suelta con una sola pulsación, sin ángulo |
 | #13 | 27/10 | Salto de altura rehecho: carrera manual, zona de batida pintada antes del listón, ángulo que sube al mantener saltar y listón que sube 4 cm tras cada salto válido |
-| #14 | 27/10 | Mejora gráfica con degradados, brillos y sombras translúcidas. **Rechazada por el usuario**: quitaba el aspecto retro. Sustituida por la versión plana (ver Estética) |
+| #14 | 27/10 | Mejora gráfica con degradados, brillos y sombras translúcidas. **Rechazada por el usuario**: quitaba el aspecto retro. Cerrada sin fusionar el 3/11, sustituida por el #19 |
 | #15 | 27/10 (fusionado el 28/10) | Barra de velocidad para cada corredor en las carreras a dos jugadores |
+| #19 | 3/11 | Mejora gráfica rehecha en estilo arcade plano de 1983 (ver Estética): público animado, marcador y vallas publicitarias, campos detallados, partículas de píxel, cielo del título, ceremonia y botón CRT de líneas de barrido, todo con colores lisos y opacos |
 
-Todos están fusionados en `main` salvo el #14, que se cierra sin fusionar (comprobado el 3/11/2026).
+Todos están fusionados en `main` salvo el #14 (cerrado sin fusionar el 3/11) y el #19, abierto el 3/11 (comprobado el 3/11/2026).
 
 ## Ramas y repos retirados
 
