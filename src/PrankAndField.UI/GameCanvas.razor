@@ -1,3 +1,4 @@
+@using PrankAndField.Core
 @using PrankAndField.Core.Localization
 @implements IAsyncDisposable
 @inject IJSRuntime JS
@@ -36,7 +37,7 @@
         <canvas id="@_canvasId" class="paf-canvas" tabindex="0"></canvas>
         @if (Host.Online is { } match && !_panelOpen && !match.IsOver && match.Status == OnlineStatus.Playing)
         {
-            <div class="paf-online-badge">@T("online.playing", match.PlayerNumber ?? 1)@(match.IsLagging ? " - " + T("online.lag") : "")</div>
+            <div class="paf-online-badge">@ModeName(match.Mode) - @T("online.playing", match.PlayerNumber ?? 1)@(match.IsLagging ? " - " + T("online.lag") : "")</div>
         }
         @if (_panelOpen || Host.Online is { IsOver: true })
         {
@@ -50,6 +51,14 @@
                         break;
                     case null:
                         <p>@T("online.intro")</p>
+                        <div class="paf-online-modes" role="radiogroup" aria-label="@T("online.mode")">
+                            <span>@T("online.mode")</span>
+                            @foreach (var mode in GameModeExtensions.All)
+                            {
+                                <button class="paf-btn @(mode == _onlineMode ? "paf-on" : "")" type="button" role="radio" aria-checked="@(mode == _onlineMode ? "true" : "false")"
+                                        @onclick="() => _onlineMode = mode">@ModeName(mode)</button>
+                            }
+                        </div>
                         <button class="paf-btn" type="button" @onclick="CreateRoom">@T("online.create")</button>
                         <div class="paf-online-join">
                             <input class="paf-online-code" maxlength="5" placeholder="@T("online.code")" @bind="_joinCode" @bind:event="oninput" @onkeydown="OnCodeKey" />
@@ -64,6 +73,7 @@
                     case { Status: OnlineStatus.WaitingForOpponent } waiting:
                         <p>@T("online.waiting", waiting.Code ?? "")</p>
                         <p class="paf-online-big">@waiting.Code</p>
+                        <p class="paf-online-mode">@ModeName(waiting.Mode)</p>
                         <p>@T("online.share")</p>
                         <div class="paf-online-join">
                             <input class="paf-online-link" readonly value="@InviteLink(waiting.Code)" />
@@ -72,6 +82,7 @@
                         <button class="paf-btn" type="button" @onclick="LeaveOnline">@T("online.leave")</button>
                         break;
                     case { Status: OnlineStatus.Playing } playing:
+                        <p class="paf-online-mode">@ModeName(playing.Mode)</p>
                         <p>@T("online.playing", playing.PlayerNumber ?? 1)</p>
                         <p>@T("online.controls")</p>
                         <button class="paf-btn" type="button" @onclick="ToggleOnlinePanel">@T("online.close")</button>
@@ -103,6 +114,7 @@
     private Uri? _relayUrl;
     private string? _relayKey;
     private bool _panelOpen;
+    private GameMode _onlineMode = GameMode.TrackAndField;
     private string _joinCode = "";
     private string? _autoJoinCode;
     private Timer? _onlineTimer;
@@ -124,6 +136,8 @@
     private static string T(string key) => Host.Game.Localizer.Get(key);
 
     private static string T(string key, object arg) => Host.Game.Localizer.Format(key, arg);
+
+    private static string ModeName(GameMode mode) => T(mode == GameMode.HyperSports ? "mode.hypersports" : "mode.trackfield");
 
     protected override void OnInitialized()
     {
@@ -149,12 +163,17 @@
         return result;
     }
 
-    private void ToggleOnlinePanel() => _panelOpen = !_panelOpen;
+    private void ToggleOnlinePanel()
+    {
+        _panelOpen = !_panelOpen;
+        // Opening the panel from the title proposes the game highlighted on the menu.
+        if (_panelOpen && Host.Online is null && Host.Game.State == GameState.Title) _onlineMode = Host.Game.MenuMode;
+    }
 
     private void CreateRoom()
     {
         if (_relayUrl is null || Host.Online is not null || Host.OnlineLocked) return;
-        Host.CreateOnline(_relayUrl, _relayKey);
+        Host.CreateOnline(_relayUrl, _relayKey, _onlineMode);
     }
 
     private void JoinRoom()

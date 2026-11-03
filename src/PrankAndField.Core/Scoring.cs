@@ -13,6 +13,13 @@ public static class Scoring
             EventKind.JavelinThrow => mark * 50,
             EventKind.HammerThrow => mark * 50,
             EventKind.HighJump => mark * 1000,
+            // Hyper Sports: a good round-1 mark is worth about the same as in the 1983 events (3000-6000)
+            EventKind.Swimming100m => (40.0 - mark) * 500,
+            EventKind.SkeetShooting => mark * 400,
+            EventKind.LongHorse => mark * 700,
+            EventKind.Archery => mark * 120,
+            EventKind.TripleJump => mark * 300,
+            EventKind.Weightlifting => mark * 30,
             _ => 0,
         };
         return Math.Max(0, (long)Math.Round(points / 10.0) * 10);

@@ -27,6 +27,10 @@ solo en el secreto de GitHub y en el `.env` de la VM.
 - Construye `src/PrankAndField.Server/Dockerfile` para **linux/amd64 y linux/arm64** (la VM es Ampere,
   arm64) y publica `ghcr.io/luqq/prankandfield-server:main` y `:<sha>`.
 - La etiqueta `:main-online` existe pero está congelada en el PR #7; usar siempre `:main`.
+- Cuando un merge cambia el protocolo del hub (como el juego de la sala para Hyper Sports online, 3/11/2026),
+  hay que actualizar el contenedor de la VM tras publicarse la imagen; mientras tanto el juego publicado sigue
+  jugando Prank & Field online y avisa al intentar crear una sala de Hyper Sports. Ver
+  [arquitectura-multijugador § Compatibilidad](arquitectura-multijugador.md#compatibilidad-entre-versiones).
 - Los paquetes de GHCR nacen privados: o se hace público el paquete (Settings del paquete → Change
   visibility), o en la VM se hace `docker login ghcr.io` con un PAT *classic* con `read:packages`.
 

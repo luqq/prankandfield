@@ -2,11 +2,14 @@ using System.Security.Cryptography;
 
 namespace PrankAndField.Server;
 
-/// <summary>A private two-seat room. Seat 0 (P1) is whoever created it.</summary>
-public sealed class Room(string code, uint seed)
+/// <summary>A private two-seat room. Seat 0 (P1) is whoever created it, and it plays the game they chose.</summary>
+public sealed class Room(string code, uint seed, int mode)
 {
     public string Code { get; } = code;
     public uint Seed { get; } = seed;
+
+    /// <summary>Game mode of the match (<c>PrankAndField.Core.GameMode</c>: 0 = Track &amp; Field, 1 = Hyper Sports).</summary>
+    public int Mode { get; } = mode;
     public string?[] Seats { get; } = new string?[2];
     public bool IsFull => Seats[0] is not null && Seats[1] is not null;
 
@@ -37,14 +40,14 @@ public sealed class RoomRegistry
         get { lock (_sync) return _rooms.Count; }
     }
 
-    public Room Create(string connectionId)
+    public Room Create(string connectionId, int mode = 0)
     {
         lock (_sync)
         {
             if (_byConnection.ContainsKey(connectionId)) throw new InvalidOperationException("The connection is already in a room.");
             string code;
             do code = NewCode(); while (_rooms.ContainsKey(code));
-            var room = new Room(code, (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue));
+            var room = new Room(code, (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue), mode);
             room.Seats[0] = connectionId;
             _rooms[code] = room;
             _byConnection[connectionId] = (room, 0);

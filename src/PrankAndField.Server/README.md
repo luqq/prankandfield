@@ -8,8 +8,9 @@ in lockstep on both clients (`PrankAndField.Net`); the server never simulates.
 
 | Client calls | Returns / effect |
 |---|---|
-| `CreateRoom()` | `{ code }`: the creator is P1 (seat 0). |
-| `JoinRoom(code)` | `{ ok, error }`: the joiner is P2. Both then receive `MatchStarted { seed, seat, inputDelay }`. |
+| `CreateRoom()` | `{ code }`: the creator is P1 (seat 0) and the room plays Track & Field. Kept for clients that predate game modes. |
+| `CreateRoomWithMode(mode)` | `{ code }`: same, for a given game (`0` Track & Field, `1` Hyper Sports; anything else is a `HubException`). |
+| `JoinRoom(code)` | `{ ok, error }`: the joiner is P2 and plays the room's game. Both then receive `MatchStarted { seed, seat, inputDelay, mode }`. |
 | `SendInput(firstTick, masks[])` | Forwarded to the opponent as `Input(seat, firstTick, masks)`. |
 | `SendChecksum(tick, checksum)` | Forwarded as `Checksum(seat, tick, checksum)`. |
 

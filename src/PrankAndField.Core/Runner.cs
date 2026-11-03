@@ -19,6 +19,9 @@ public sealed class Runner
     public double PositionM { get; set; }
     public double MaxSpeed { get; set; } = MaxSpeedCm;
 
+    /// <summary>Multiplies the impulse of every press (1 for a runner; a swimmer's stroke is worth less).</summary>
+    public double ImpulseScale { get; set; } = 1.0;
+
     /// <summary>When locked, presses are ignored and speed stays constant (used while airborne).</summary>
     public bool Locked { get; set; }
 
@@ -40,7 +43,7 @@ public sealed class Runner
     {
         if (Locked) return;
         PressCount++;
-        double impulse = _lastButton == 0 || _lastButton != button ? ImpulseAlternate : ImpulseRepeat;
+        double impulse = (_lastButton == 0 || _lastButton != button ? ImpulseAlternate : ImpulseRepeat) * ImpulseScale;
         _lastButton = button;
         SpeedCm = Math.Min(MaxSpeed, SpeedCm + impulse);
     }
@@ -63,8 +66,8 @@ public sealed class Runner
     }
 
     /// <summary>Steady-state speed for an alternating tapping frequency, handy for tuning and tests.</summary>
-    public static double SteadySpeedFor(double pressesPerSecond) =>
-        Math.Min(MaxSpeedCm, ImpulseAlternate * pressesPerSecond / DragPerSecond);
+    public static double SteadySpeedFor(double pressesPerSecond, double impulseScale = 1.0, double maxSpeed = MaxSpeedCm) =>
+        Math.Min(maxSpeed, ImpulseAlternate * impulseScale * pressesPerSecond / DragPerSecond);
 }
 
 /// <summary>Simple ballistic helper (metres, seconds).</summary>

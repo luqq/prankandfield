@@ -29,10 +29,11 @@ public sealed class OnlineMatch : IAsyncDisposable
     private readonly Localizer _localizer;
     private readonly CancellationTokenSource _cts = new();
 
-    private OnlineMatch(Uri hubUrl, string? accessKey, Localizer localizer)
+    private OnlineMatch(Uri hubUrl, string? accessKey, Localizer localizer, GameMode mode)
     {
         _client = new RelayClient(hubUrl, accessKey);
         _localizer = localizer;
+        Mode = mode;
         _client.OpponentLeft += () =>
         {
             if (Status is OnlineStatus.Playing or OnlineStatus.WaitingForOpponent) Status = OnlineStatus.OpponentLeft;
@@ -43,6 +44,12 @@ public sealed class OnlineMatch : IAsyncDisposable
 
     /// <summary>Room code to share, known once the room exists (both for the host and the guest).</summary>
     public string? Code { get; private set; }
+
+    /// <summary>
+    /// The game of this match: the one chosen when creating the room, or, for a guest, the one the server
+    /// announces once both seats are taken (Track &amp; Field until then).
+    /// </summary>
+    public GameMode Mode { get; private set; }
 
     /// <summary>Why the connection failed, when <see cref="Status"/> is <see cref="OnlineStatus.Failed"/>.</summary>
     public string? Error { get; private set; }
@@ -57,30 +64,32 @@ public sealed class OnlineMatch : IAsyncDisposable
 
     public bool IsOver => Status is OnlineStatus.Finished or OnlineStatus.OpponentLeft or OnlineStatus.Desynced or OnlineStatus.Failed;
 
-    /// <summary>Opens a room as P1. Returns immediately; follow <see cref="Status"/>.</summary>
-    public static OnlineMatch Create(Uri hubUrl, string? accessKey, Localizer localizer)
+    /// <summary>Opens a room as P1 for a match of <paramref name="mode"/>. Returns immediately; follow <see cref="Status"/>.</summary>
+    public static OnlineMatch Create(Uri hubUrl, string? accessKey, Localizer localizer, GameMode mode = GameMode.TrackAndField)
     {
-        var match = new OnlineMatch(hubUrl, accessKey, localizer);
+        var match = new OnlineMatch(hubUrl, accessKey, localizer, mode);
         _ = match.RunAsync(null);
         return match;
     }
 
-    /// <summary>Joins an existing room as P2. Returns immediately; follow <see cref="Status"/>.</summary>
+    /// <summary>Joins an existing room as P2; the host chose the game. Returns immediately; follow <see cref="Status"/>.</summary>
     public static OnlineMatch Join(Uri hubUrl, string? accessKey, string code, Localizer localizer)
     {
-        var match = new OnlineMatch(hubUrl, accessKey, localizer);
+        var match = new OnlineMatch(hubUrl, accessKey, localizer, GameMode.TrackAndField);
         _ = match.RunAsync(code.Trim().ToUpperInvariant());
         return match;
     }
 
     private async Task RunAsync(string? joinCode)
     {
+        bool creating = joinCode is null;
         try
         {
             await _client.StartAsync(_cts.Token);
             if (joinCode is null)
             {
-                Code = await _client.CreateRoomAsync(_cts.Token);
+                Code = await _client.CreateRoomAsync(Mode, _cts.Token);
+                creating = false;
             }
             else
             {
@@ -90,6 +99,7 @@ public sealed class OnlineMatch : IAsyncDisposable
             Status = OnlineStatus.WaitingForOpponent;
 
             var settings = await _client.WaitForMatchAsync(_cts.Token);
+            Mode = settings.Mode;
             var game = new Game(_localizer, new WorldRecords(), settings.Seed, online: true);
             var session = new LockstepSession(settings, _client.Transport, game);
             session.DesyncDetected += _ => Status = OnlineStatus.Desynced;
@@ -98,6 +108,13 @@ public sealed class OnlineMatch : IAsyncDisposable
         }
         catch (OperationCanceledException) when (_cts.IsCancellationRequested)
         {
+        }
+        catch (NotSupportedException)
+        {
+            // Creating the room failed: the relay predates game modes. Otherwise the relay announced a game this
+            // build does not know: it is the game that is out of date.
+            Error = _localizer[creating ? "online.mode_unsupported" : "online.game_outdated"];
+            Status = OnlineStatus.Failed;
         }
         catch (Exception ex)
         {
