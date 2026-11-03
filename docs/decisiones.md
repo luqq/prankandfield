@@ -44,6 +44,7 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #11 | 26/10 | Documentación para agentes: `AGENTS.md`, `docs/` |
 | #12 | 27/10 | Martillo: giro continuo con el lanzador en 3D proyectado (`SpinnerSprite`), órbita inclinada y arco rojo de lanzamiento; se suelta con una sola pulsación, sin ángulo |
 | #13 | 27/10 | Salto de altura rehecho: carrera manual, zona de batida pintada antes del listón, ángulo que sube al mantener saltar y listón que sube 4 cm tras cada salto válido |
+| #20 | 3/11 | Botonera táctil: INICIO · SALTAR/LANZAR · CORRER · CORRER, con los dos de correr juntos a la derecha del de saltar |
 | #15 | 27/10 | Barra de velocidad para cada corredor en las carreras a dos jugadores |
 | Hyper Sports | 27/10 - 3/11 | Modo Hyper Sports en el título con sus seis pruebas, textos en los 4 idiomas, sonidos, tests y calibrado; desde el 3/11 también online (el creador de la sala elige el juego). Sustituye al borrador #16 |
 
