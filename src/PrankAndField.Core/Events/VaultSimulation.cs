@@ -92,7 +92,8 @@ public sealed class VaultSimulation : FieldEventSimulation
                 break;
 
             case VaultState.Approach:
-                AutoRunStep(a, dt, Rules.VaultRunSpeed);
+                // The press is judged where the vaulter was drawn when the button went down (before this
+                // tick's stride): at the fixed speed a stride is 15 cm, a good share of the board zone.
                 if (e.ActionPressed && a.Runner.SpeedCm > 0)
                 {
                     double gap = BoardX - a.X;
@@ -108,11 +109,10 @@ public sealed class VaultSimulation : FieldEventSimulation
                     {
                         TakeOff(a, gap);
                     }
+                    break;
                 }
-                else if (a.X > BoardX + Rules.LongJumpOvershoot)
-                {
-                    Foul(a); // ran into the horse
-                }
+                AutoRunStep(a, dt, Rules.VaultRunSpeed);
+                if (a.X > BoardX + Rules.LongJumpOvershoot) Foul(a); // ran into the horse
                 break;
 
             case VaultState.PreFlight:
@@ -234,6 +234,9 @@ public sealed class VaultSimulation : FieldEventSimulation
     }
 
     protected override void OnAttemptCompleted(Athlete a, Attempt result) => a.Runner.Locked = false;
+
+    /// <summary>Only an untouched attempt times out: once RUN is pressed the vault ends by itself within seconds.</summary>
+    protected override bool AttemptIsIdle => State == VaultState.Ready;
 
     public override void AddChecksum(ref StateHash h)
     {

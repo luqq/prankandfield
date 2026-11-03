@@ -155,7 +155,7 @@ public static class Rules
     // off inside a zone painted on the apron, holds the button to set the angle and clears a bar that
     // rises after every valid jump. The bar plane is x = 0.
     public const double HighJumpApproachStart = -18.0;  // metres before the bar where the run-up starts
-    public const double HighJumpRunSpeed = 950;         // cm/s of the automatic run-up: at the best angle on the line it clears up to 2.49
+    public const double HighJumpRunSpeed = 1000;        // cm/s of the automatic run-up: at the best angle on the line it clears up to 2.53, so round 4's last bar (2.48) keeps a few frames of margin
     public const double HighJumpZoneFar = -1.9;         // take-off zone painted on the apron: from here...
     public const double HighJumpZoneNear = -0.4;        // ...to here (a late take-off past it still counts, with less lift)
     public const double HighJumpCrashX = -0.15;         // still on the ground here: he runs into the uprights
