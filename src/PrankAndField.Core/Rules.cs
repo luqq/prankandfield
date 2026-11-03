@@ -18,6 +18,11 @@ public static class Rules
     public const int WorldRecordBonus = 3000;
     public const int TieBonus = 1000;
 
+    // --- Automatic run-ups (high jump, long horse) --------------------------------------
+    // One RUN press starts the run; from then on the athlete runs by himself at the event's fixed speed
+    // and the buttons add nothing, like the original arcades. The ramp from standing is only cosmetic.
+    public const double AutoRunAcceleration = 2400;    // cm/s^2: the cruise speed is reached in about 0.4 s
+
     private static readonly double[][] Qualifying =
     [
         // round 1, 2, 3, 4+
@@ -154,9 +159,11 @@ public static class Rules
     }
 
     // --- High jump --------------------------------------------------------------------------
-    // The jumper runs up on his own, takes off inside a zone painted on the apron, holds the button
-    // to set the angle and clears a bar that rises after every valid jump. The bar plane is x = 0.
+    // One RUN press and the jumper runs up on his own at a fixed speed (Track & Field, 1983); he takes
+    // off inside a zone painted on the apron, holds the button to set the angle and clears a bar that
+    // rises after every valid jump. The bar plane is x = 0.
     public const double HighJumpApproachStart = -18.0;  // metres before the bar where the run-up starts
+    public const double HighJumpRunSpeed = 1000;        // cm/s of the automatic run-up: at the best angle on the line it clears up to 2.53, so round 4's last bar (2.48) keeps a few frames of margin
     public const double HighJumpZoneFar = -1.9;         // take-off zone painted on the apron: from here...
     public const double HighJumpZoneNear = -0.4;        // ...to here (a late take-off past it still counts, with less lift)
     public const double HighJumpCrashX = -0.15;         // still on the ground here: he runs into the uprights
@@ -256,7 +263,10 @@ public static class Rules
     public const int SkeetStreakBonus = 500;
 
     // --- Long horse (vault) -----------------------------------------------------------------
+    // One RUN press and the vaulter runs by himself at a fixed speed (Hyper Sports, 1984); the skill is
+    // in the timing of the board, the push, the twists and the landing.
     public const double VaultBoard = 25.0;             // metres from the start to the springboard
+    public const double VaultRunSpeed = 900;           // cm/s of the automatic run-up (the board zone passes in about 0.14 s)
     public const double VaultBoardZone = 1.1;          // metres before the board where a take-off is accepted
     public const double VaultBoardSweetSpot = 0.25;    // best take-off: this far before the board
     public const double VaultHorseStart = 26.2;        // the horse spans 1.6 m past the board

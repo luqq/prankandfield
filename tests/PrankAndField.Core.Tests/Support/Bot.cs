@@ -29,7 +29,7 @@ public sealed class Bot
     /// <summary>Metres before the board / line at which the bot takes off or throws.</summary>
     public double TakeoffMargin { get; set; } = 0.6;
 
-    /// <summary>High jump: where (metres before the bar) the bot plants its foot. Defaults to the white line.</summary>
+    /// <summary>High jump: where (metres before the bar) the bot plants its foot. Defaults to the white line. The run-up is automatic.</summary>
     public double HighJumpTakeoffX { get; set; } = Rules.HighJumpZoneBest;
 
     /// <summary>High jump: the bot lets go of the button once the meter reaches this angle.</summary>
@@ -148,10 +148,15 @@ public sealed class Bot
                 }
                 break;
             case HighJumpSimulation hj when hj.CurrentAthlete.PlayerIndex == _player && hj.Phase == AttemptPhase.Active:
-                if (hj.State == HighJumpState.Approach)
+                // one RUN press starts the automatic run-up; tapping would add nothing
+                if (hj.State == HighJumpState.Ready)
                 {
+                    if (!_pressedRun) { _pressedRun = true; run = true; }
+                }
+                else if (hj.State == HighJumpState.Approach)
+                {
+                    _pressedRun = false;
                     if (a!.X >= HighJumpTakeoffX) action = true;
-                    else run = Tap(dt);
                 }
                 else if (hj.State == HighJumpState.Rising) action = hj.Angle < HighJumpAngle;
                 break;
@@ -164,10 +169,15 @@ public sealed class Bot
                     return new InputFrame(Run1: left, Run2: right);
                 }
             case VaultSimulation v when v.CurrentAthlete.PlayerIndex == _player && v.Phase == AttemptPhase.Active:
-                if (v.State == VaultState.Approach)
+                // one RUN press starts the automatic run-up; tapping would add nothing
+                if (v.State == VaultState.Ready)
                 {
+                    if (!_pressedRun) { _pressedRun = true; run = true; }
+                }
+                else if (v.State == VaultState.Approach)
+                {
+                    _pressedRun = false;
                     if (a!.X >= v.BoardX - Rules.VaultBoardSweetSpot - 0.05) action = true;
-                    else run = Tap(dt);
                 }
                 else if (v.State == VaultState.OnHorse) action = v.HorseTime >= Rules.VaultPushBest - 0.02;
                 else if (v.State == VaultState.Flight)

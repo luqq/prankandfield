@@ -2,7 +2,8 @@ namespace PrankAndField.Core.Events;
 
 public enum HighJumpState
 {
-    Approach,   // run-up driven by the RUN buttons
+    Ready,      // on the mark: one press of a RUN button starts the run-up
+    Approach,   // automatic run-up at a fixed speed
     Rising,     // button held at the take-off spot: the angle counts up from 30
     Airborne,   // flopping over (or into) the bar
     Landed,     // on the mat with the bar still up
@@ -10,11 +11,12 @@ public enum HighJumpState
 }
 
 /// <summary>
-/// High jump. The athlete runs up with the RUN buttons, presses JUMP inside the zone painted before the
-/// bar and holds it to set the angle; the lift comes from the run-up speed, the angle (about 75 degrees
-/// is best) and how close to the white line he took off. Inside the zone the apex is always over the bar,
-/// so the timing decides *how much* height is lost, never where the arc ends. The bar rises
-/// <see cref="Rules.HighJumpBarStep"/> after every valid jump and stays after a miss.
+/// High jump. One press of a RUN button and the athlete runs up by himself at a fixed speed, as in the
+/// 1983 arcade; the player presses JUMP inside the zone painted before the bar and holds it to set the
+/// angle. The lift comes from that fixed speed, the angle (about 75 degrees is best) and how close to the
+/// white line he took off. Inside the zone the apex is always over the bar, so the timing decides *how
+/// much* height is lost, never where the arc ends. The bar rises <see cref="Rules.HighJumpBarStep"/>
+/// after every valid jump and stays after a miss.
 /// </summary>
 public sealed class HighJumpSimulation : FieldEventSimulation
 {
@@ -74,7 +76,7 @@ public sealed class HighJumpSimulation : FieldEventSimulation
 
     protected override void BeginAttempt(Athlete a)
     {
-        State = HighJumpState.Approach;
+        State = HighJumpState.Ready;
         ShowAngle = false;
         Angle = Rules.HighJumpAngleStart;
         BarFallen = false;
@@ -92,6 +94,15 @@ public sealed class HighJumpSimulation : FieldEventSimulation
     {
         switch (State)
         {
+            case HighJumpState.Ready:
+                // Nothing moves until a RUN button is pressed; JUMP on the mark is ignored.
+                if (e.AnyRunPressed)
+                {
+                    State = HighJumpState.Approach;
+                    StartAutoRun(a);
+                }
+                break;
+
             case HighJumpState.Approach:
                 // The press is honoured where the jumper was when the button went down (before this
                 // tick's stride), so the take-off spot is the one the player saw.
@@ -100,7 +111,7 @@ public sealed class HighJumpSimulation : FieldEventSimulation
                     Plant(a);
                     break;
                 }
-                RunStep(a, e, dt);
+                AutoRunStep(a, dt, Rules.HighJumpRunSpeed);
                 if (a.X > Rules.HighJumpCrashX) Crash(a); // ran into the uprights
                 break;
 
@@ -135,7 +146,7 @@ public sealed class HighJumpSimulation : FieldEventSimulation
         Angle = Rules.HighJumpAngleStart;
         _takeoffX = a.X;
         _runSpeed = a.Runner.SpeedMetersPerSecond;
-        a.Runner.Locked = true; // the SPEED bar keeps the take-off speed
+        a.Runner.Locked = true; // (already locked by the automatic run-up) the SPEED bar keeps the take-off speed
         a.Pose = Pose.Jump;
         Cue(AudioCue.SfxJump);
     }
@@ -231,5 +242,26 @@ public sealed class HighJumpSimulation : FieldEventSimulation
         // Every failed try counts, including one that timed out without a jump: two of them and a
         // clearance on the third summon the mole.
         if (result.Foul) _misses[a.PlayerIndex]++;
+    }
+
+    /// <summary>Only an untouched attempt times out: once RUN is pressed the run-up ends by itself within seconds.</summary>
+    protected override bool AttemptIsIdle => State == HighJumpState.Ready;
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)State);
+        foreach (var b in _bar) h.Add(b);
+        foreach (var m in _misses) h.Add(m);
+        h.Add(_takeoffX);
+        h.Add(_runSpeed);
+        h.Add(_rise);
+        h.Add(_travel);
+        h.Add(_flightTime);
+        h.Add(_flightDuration);
+        h.Add(_crossedBar);
+        h.Add(BarFallen);
+        h.Add(BarFallAnim);
+        h.Add(Angle);
     }
 }
