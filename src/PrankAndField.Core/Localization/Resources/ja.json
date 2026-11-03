@@ -149,6 +149,8 @@
   "online.leave": "退出",
   "online.close": "閉じる",
   "online.controls": "P1かP2の操作で自分の選手を動かします",
+  "online.mode": "ゲーム:",
+  "online.mode_unsupported": "サーバーはまだこのゲームに対応していません。サーバーを更新してください（それまではプランク＆フィールドでオンライン対戦できます）。",
   "touch.run": "走る",
   "touch.action": "ジャンプ / 投げる",
   "touch.start": "スタート",

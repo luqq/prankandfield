@@ -16,8 +16,8 @@ public sealed record RoomCreated(string Code);
 
 public sealed record JoinResult(bool Ok, string? Error);
 
-/// <summary>Sent to each peer once both seats are taken.</summary>
-public sealed record MatchStart(uint Seed, int Seat, int InputDelay);
+/// <summary>Sent to each peer once both seats are taken. <paramref name="Mode"/> is the game chosen by the room's creator.</summary>
+public sealed record MatchStart(uint Seed, int Seat, int InputDelay, int Mode);
 
 /// <summary>
 /// Relay hub: private rooms by code, then plain forwarding of inputs and checksums to the opponent.
@@ -28,9 +28,18 @@ public sealed class MatchHub(RoomRegistry rooms, IOptions<RelayOptions> options)
     public const string Path = "/hub";
     public const int MaxMasksPerMessage = 120;
 
-    public RoomCreated CreateRoom()
+    /// <summary>Game modes the relay hands out, mirroring <c>PrankAndField.Core.GameMode</c> (the server does not reference Core).</summary>
+    public const int TrackAndFieldMode = 0;
+    public const int HyperSportsMode = 1;
+
+    /// <summary>Opens a Track &amp; Field room. Kept for clients that predate game modes.</summary>
+    public RoomCreated CreateRoom() => CreateRoomWithMode(TrackAndFieldMode);
+
+    /// <summary>Opens a room for a match of <paramref name="mode"/> (0 = Track &amp; Field, 1 = Hyper Sports).</summary>
+    public RoomCreated CreateRoomWithMode(int mode)
     {
-        var room = rooms.Create(Context.ConnectionId);
+        if (mode is < TrackAndFieldMode or > HyperSportsMode) throw new HubException($"Unknown game mode {mode}.");
+        var room = rooms.Create(Context.ConnectionId, mode);
         return new RoomCreated(room.Code);
     }
 
@@ -40,8 +49,8 @@ public sealed class MatchHub(RoomRegistry rooms, IOptions<RelayOptions> options)
         if (error != JoinError.None) return new JoinResult(false, error.ToString());
 
         int delay = Math.Clamp(options.Value.InputDelay, 1, 30);
-        await Clients.Client(room!.Seats[0]!).SendAsync(HubEvents.MatchStarted, new MatchStart(room.Seed, 0, delay));
-        await Clients.Caller.SendAsync(HubEvents.MatchStarted, new MatchStart(room.Seed, 1, delay));
+        await Clients.Client(room!.Seats[0]!).SendAsync(HubEvents.MatchStarted, new MatchStart(room.Seed, 0, delay, room.Mode));
+        await Clients.Caller.SendAsync(HubEvents.MatchStarted, new MatchStart(room.Seed, 1, delay, room.Mode));
         return new JoinResult(true, null);
     }
 

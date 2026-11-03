@@ -149,6 +149,8 @@
   "online.leave": "SALIR",
   "online.close": "CERRAR",
   "online.controls": "USA LOS CONTROLES DE J1 O J2: LOS DOS MUEVEN A TU ATLETA",
+  "online.mode": "JUEGO:",
+  "online.mode_unsupported": "EL SERVIDOR AÚN NO CONOCE ESTE JUEGO. ACTUALIZA EL SERVIDOR (O JUEGA A PRANK & FIELD ONLINE MIENTRAS TANTO).",
   "touch.run": "CORRER",
   "touch.action": "SALTAR / LANZAR",
   "touch.start": "INICIO",

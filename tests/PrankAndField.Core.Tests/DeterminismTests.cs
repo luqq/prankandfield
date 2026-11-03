@@ -64,6 +64,28 @@ public class DeterminismTests
     }
 
     [Fact]
+    public void AnOnlineCreditCanBeHyperSports()
+    {
+        var online = new Game(online: true);
+        online.StartOnlineCredit(GameMode.HyperSports);
+        Assert.Equal(GameMode.HyperSports, online.Mode);
+        Assert.Equal((GameMode.HyperSports, 2), (online.MenuMode, online.MenuPlayers));
+        Assert.Equal(GameState.NameEntry, online.State);
+        Assert.True(online.SimultaneousNameEntry);
+
+        // Both seats confirm their names: the first event is the swim, as on the title menu.
+        online.Tick(new InputFrame(Start: true), new InputFrame(Start: true));
+        online.Tick(InputFrame.None, InputFrame.None);
+        Assert.Equal(GameState.EventIntro, online.State);
+        Assert.Equal(EventKind.Swimming100m, online.CurrentEvent);
+
+        // Two games of different modes never share a checksum, even before the first event.
+        var track = new Game(online: true);
+        track.StartOnlineCredit();
+        Assert.NotEqual(track.Checksum(), online.Checksum());
+    }
+
+    [Fact]
     public void EachOnlineSeatTypesOnlyItsOwnNameAtTheSameTime()
     {
         var game = new Game(online: true);

@@ -149,6 +149,8 @@
   "online.leave": "EIXIR",
   "online.close": "TANCAR",
   "online.controls": "USA ELS CONTROLS DE J1 O J2: TOTS DOS MOUEN EL TEU ATLETA",
+  "online.mode": "JOC:",
+  "online.mode_unsupported": "EL SERVIDOR ENCARA NO CONEIX ESTE JOC. ACTUALITZA EL SERVIDOR (O JUGA A PRANK & FIELD EN LÍNIA MENTRESTANT).",
   "touch.run": "CÓRRER",
   "touch.action": "BOTAR / LLANÇAR",
   "touch.start": "INICI",

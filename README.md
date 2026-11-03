@@ -58,9 +58,11 @@ repository path, adds `.nojekyll` so the `_framework` folder is served, and copi
 ## Online play
 
 The **ONLINE** button in the toolbar opens a room on the relay server (`src/PrankAndField.Server`) and shows a
-five-letter code and an invite link (`?sala=CODE`); the other player types the code or opens the link. Each
-browser is one player (both local control sets move your athlete) and both run the same simulation in lockstep.
-Online matches use their own record board and never touch the local one.
+five-letter code and an invite link (`?sala=CODE`); the other player types the code or opens the link. Whoever
+creates the room picks the game, **Prank & Field** or **Hyper Sports** (the panel proposes the one highlighted on
+the title menu), and the guest plays that one. Each browser is one player (both local control sets move your
+athlete) and both run the same simulation in lockstep. Online matches use their own record board and never
+touch the local one.
 
 The button only appears when the web host knows the relay: set `RelayUrl` in
 `src/PrankAndField.Web/wwwroot/appsettings.json` (for example `https://paf.example.com/hub`), or add

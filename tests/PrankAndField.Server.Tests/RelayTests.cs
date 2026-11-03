@@ -1,6 +1,9 @@
 using System.Net;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR.Client;
 using PrankAndField.Core;
 using PrankAndField.Core.Tests.Support;
 using PrankAndField.Net;
@@ -12,25 +15,27 @@ public class RelayTests(WebApplicationFactory<Program> factory) : IClassFixture<
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
-    private async Task<RelayClient> ConnectAsync()
+    private void UseTestServer(HttpConnectionOptions options)
     {
         var server = factory.Server;
-        var client = new RelayClient(new Uri(server.BaseAddress, MatchHub.Path), configure: options =>
-        {
-            options.Transports = HttpTransportType.WebSockets;
-            options.SkipNegotiation = true;
-            options.WebSocketFactory = async (context, ct) =>
-                await server.CreateWebSocketClient().ConnectAsync(context.Uri, ct);
-        });
+        options.Transports = HttpTransportType.WebSockets;
+        options.SkipNegotiation = true;
+        options.WebSocketFactory = async (context, ct) =>
+            await server.CreateWebSocketClient().ConnectAsync(context.Uri, ct);
+    }
+
+    private async Task<RelayClient> ConnectAsync()
+    {
+        var client = new RelayClient(new Uri(factory.Server.BaseAddress, MatchHub.Path), configure: UseTestServer);
         await client.StartAsync();
         return client;
     }
 
-    private async Task<(RelayClient Host, RelayClient Guest, MatchSettings HostMatch, MatchSettings GuestMatch)> StartMatchAsync()
+    private async Task<(RelayClient Host, RelayClient Guest, MatchSettings HostMatch, MatchSettings GuestMatch)> StartMatchAsync(GameMode mode = GameMode.TrackAndField)
     {
         var host = await ConnectAsync();
         var guest = await ConnectAsync();
-        string code = await host.CreateRoomAsync();
+        string code = await host.CreateRoomAsync(mode);
         await guest.JoinRoomAsync(code);
         var hostMatch = await host.WaitForMatchAsync().WaitAsync(Timeout);
         var guestMatch = await guest.WaitForMatchAsync().WaitAsync(Timeout);
@@ -57,6 +62,39 @@ public class RelayTests(WebApplicationFactory<Program> factory) : IClassFixture<
         Assert.Equal(1, guestMatch.LocalSeat);
         Assert.Equal(4, hostMatch.InputDelay);
         Assert.Equal(hostMatch.InputDelay, guestMatch.InputDelay);
+        Assert.Equal(GameMode.TrackAndField, hostMatch.Mode);
+        Assert.Equal(GameMode.TrackAndField, guestMatch.Mode);
+    }
+
+    [Fact]
+    public async Task TheGuestPlaysTheGameTheHostChose()
+    {
+        var (host, guest, hostMatch, guestMatch) = await StartMatchAsync(GameMode.HyperSports);
+        await using var _ = host;
+        await using var __ = guest;
+
+        Assert.Equal(GameMode.HyperSports, hostMatch.Mode);
+        Assert.Equal(GameMode.HyperSports, guestMatch.Mode);
+        Assert.Equal(hostMatch.Seed, guestMatch.Seed);
+        var p2 = new LockstepSession(guestMatch, guest.Transport);
+        Assert.Equal(GameMode.HyperSports, p2.Game.Mode);
+        Assert.Equal(2, p2.Game.PlayerCount);
+    }
+
+    [Fact]
+    public async Task TheRelayRejectsAGameItDoesNotKnow()
+    {
+        // A raw connection, because RelayClient refuses to send an undefined mode in the first place.
+        await using var raw = new HubConnectionBuilder().WithUrl(new Uri(factory.Server.BaseAddress, MatchHub.Path), UseTestServer).Build();
+        await raw.StartAsync();
+        await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", 7));
+        await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", -1));
+        // ...and still opens the known ones through either call.
+        Assert.Equal(RoomRegistry.CodeLength, (await raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", MatchHub.HyperSportsMode)).Code.Length);
+
+        await using var client = await ConnectAsync();
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => client.CreateRoomAsync((GameMode)7));
+        Assert.Equal(RoomRegistry.CodeLength, (await client.CreateRoomAsync()).Length);
     }
 
     [Fact]
@@ -70,10 +108,12 @@ public class RelayTests(WebApplicationFactory<Program> factory) : IClassFixture<
         await Assert.ThrowsAsync<InvalidOperationException>(() => third.JoinRoomAsync("ZZZZZ"));
     }
 
-    [Fact]
-    public async Task TwoPeersPlayInLockstepThroughTheRelay()
+    [Theory]
+    [InlineData(GameMode.TrackAndField, EventKind.Dash100m)]
+    [InlineData(GameMode.HyperSports, EventKind.Swimming100m)]
+    public async Task TwoPeersPlayInLockstepThroughTheRelay(GameMode mode, EventKind firstEvent)
     {
-        var (host, guest, hostMatch, guestMatch) = await StartMatchAsync();
+        var (host, guest, hostMatch, guestMatch) = await StartMatchAsync(mode);
         await using var _h = host;
         await using var _g = guest;
         var p1 = new LockstepSession(hostMatch, host.Transport);
@@ -95,6 +135,9 @@ public class RelayTests(WebApplicationFactory<Program> factory) : IClassFixture<
         Assert.Equal(Ticks, p2.CurrentTick);
         Assert.Equal(p1.Game.Checksum(), p2.Game.Checksum());
         Assert.NotEqual(GameState.NameEntry, p1.Game.State);
+        Assert.Equal(mode, p1.Game.Mode);
+        Assert.Equal(mode, p2.Game.Mode);
+        Assert.Equal(firstEvent, p1.Game.CurrentEvent);
         Assert.False(p1.IsDesynced);
         Assert.False(p2.IsDesynced);
     }

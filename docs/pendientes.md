@@ -34,12 +34,12 @@ Lo que quedaba abierto al cerrar la primera etapa del online (26/10/2026). Nada 
       `FieldEventSimulation`.
 - [ ] Online en el host de escritorio (habría que comprobar que `Math.Sin/Cos` dan lo mismo que en WASM).
 
-## Hyper Sports (modo añadido el 27/10/2026)
+## Hyper Sports (modo añadido el 27/10/2026, online el 3/11/2026)
 
-- [ ] **Online**: el relay no transmite el modo, así que las partidas online son siempre de Prank & Field.
-      `Game.StartOnlineCredit(GameMode)` ya acepta el modo; falta llevarlo en el mensaje de inicio de sala
-      (`PrankAndField.Net`/`Server`) y redesplegar la imagen del servidor a la vez que el juego, porque el
-      cambio de protocolo rompe la compatibilidad entre versiones.
+- [ ] **Actualizar el servidor de la VM** tras fusionar el online de Hyper Sports (`docker compose pull &&
+      docker compose up -d` en `/opt/prankandfield-server`). Hasta entonces el juego publicado puede crear
+      salas de Prank & Field, pero al crear una de Hyper Sports avisa de que el servidor aún no conoce ese
+      juego (`online.mode_unsupported`). Ver [despliegue](despliegue.md#imagen-del-servidor-ghcr).
 - [ ] Afinar la jugabilidad con jugadores reales. Las mínimas, los récords y las constantes de `Rules.cs`
       (natación, tiro al plato, potro, arco, triple salto, halterofilia) se calibraron con el bot de los
       tests; conviene probar sobre todo el ritmo de los platos dobles, la ventana de ¡RESPIRA! y la deriva de

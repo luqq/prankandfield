@@ -149,6 +149,8 @@
   "online.leave": "LEAVE",
   "online.close": "CLOSE",
   "online.controls": "USE THE P1 OR P2 CONTROLS: BOTH MOVE YOUR ATHLETE",
+  "online.mode": "GAME:",
+  "online.mode_unsupported": "THE RELAY SERVER DOES NOT KNOW THIS GAME YET. UPDATE THE SERVER (OR PLAY PRANK & FIELD ONLINE MEANWHILE).",
   "touch.run": "RUN",
   "touch.action": "JUMP / THROW",
   "touch.start": "START",

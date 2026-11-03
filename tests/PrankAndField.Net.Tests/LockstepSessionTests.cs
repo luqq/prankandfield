@@ -7,9 +7,9 @@ public class LockstepSessionTests
 {
     private const int MaxFrames = 60 * 900;
 
-    private static (LockstepSession P1, LockstepSession P2) Match(InMemoryLink link, uint seed = 21, uint? seed2 = null, int delay = 4) =>
-        (new LockstepSession(new MatchSettings(seed, 0, delay), link.A),
-         new LockstepSession(new MatchSettings(seed2 ?? seed, 1, delay), link.B));
+    private static (LockstepSession P1, LockstepSession P2) Match(InMemoryLink link, uint seed = 21, uint? seed2 = null, int delay = 4, GameMode mode = GameMode.TrackAndField) =>
+        (new LockstepSession(new MatchSettings(seed, 0, delay, Mode: mode), link.A),
+         new LockstepSession(new MatchSettings(seed2 ?? seed, 1, delay, Mode: mode), link.B));
 
     /// <summary>One frame of both peers: each samples its own bot, then the link moves messages along.</summary>
     private static void Frame(InMemoryLink link, LockstepSession a, Bot botA, LockstepSession b, Bot botB)
@@ -19,17 +19,23 @@ public class LockstepSessionTests
         link.Pump();
     }
 
-    [Fact]
-    public void BothPeersPlayTheSameCreditOverALaggyLink()
+    [Theory]
+    [InlineData(GameMode.TrackAndField)]
+    [InlineData(GameMode.HyperSports)]
+    public void BothPeersPlayTheSameCreditOverALaggyLink(GameMode mode)
     {
         var link = new InMemoryLink(latencyFrames: 3);
-        var (p1, p2) = Match(link);
+        var (p1, p2) = Match(link, mode: mode);
         var bot1 = new Bot(0, 11);
         var bot2 = new Bot(1, 10);
+        var played = new List<EventKind>();
 
         int frames = 0;
         while (p1.Game.State is not (GameState.Ceremony or GameState.GameOver) && frames++ < MaxFrames)
+        {
             Frame(link, p1, bot1, p2, bot2);
+            if (p1.Game.State == GameState.Event && (played.Count == 0 || played[^1] != p1.Game.CurrentEvent)) played.Add(p1.Game.CurrentEvent);
+        }
         // Let the trailing peer catch up to the same tick.
         while (p2.CurrentTick < p1.CurrentTick && frames++ < MaxFrames)
         {
@@ -46,6 +52,27 @@ public class LockstepSessionTests
         Assert.Equal(2, p1.Game.PlayerCount);
         Assert.Equal(p1.Game.Players[0].Score, p2.Game.Players[0].Score);
         Assert.Equal(p1.Game.Players[1].Score, p2.Game.Players[1].Score);
+        // Both peers play the game the settings named, through its events in order. The bots time their
+        // presses for an immediate response, so with four ticks of input delay they foul out before the
+        // round ends; the credit still has to get past the first events.
+        Assert.Equal(mode, p1.Game.Mode);
+        Assert.Equal(mode, p2.Game.Mode);
+        Assert.True(played.Count >= 2, $"only played {string.Join(", ", played)}");
+        Assert.Equal(mode.Events().Take(played.Count), played);
+    }
+
+    [Fact]
+    public void TheModeOfTheSettingsPicksTheGame()
+    {
+        var link = new InMemoryLink();
+        var (p1, p2) = Match(link, mode: GameMode.HyperSports);
+        Assert.Equal(GameMode.HyperSports, p1.Game.Mode);
+        Assert.Equal(GameMode.HyperSports, p2.Game.Mode);
+        Assert.Equal(GameState.NameEntry, p1.Game.State);
+        Assert.True(p1.Game.SimultaneousNameEntry);
+        Assert.Equal(p1.Game.Checksum(), p2.Game.Checksum());
+        // The default is still Track & Field, so settings from an older relay keep working.
+        Assert.Equal(GameMode.TrackAndField, new MatchSettings(1, 0).Mode);
     }
 
     [Fact]

@@ -171,6 +171,33 @@
   border-color: #555 !important;
 }
 
+.paf-online-modes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paf-online-modes span {
+  flex: none;
+  color: #9aa0b4;
+  font-size: 12px;
+}
+
+.paf-online-modes .paf-btn {
+  flex: 1;
+}
+
+.paf-online-modes .paf-btn.paf-on {
+  background: var(--paf-accent);
+  color: var(--paf-bg);
+}
+
+.paf-online-mode {
+  color: var(--paf-accent);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
 .paf-online-join {
   display: flex;
   gap: 8px;

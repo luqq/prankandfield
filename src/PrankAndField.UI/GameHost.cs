@@ -48,11 +48,14 @@ public sealed class GameHost
     /// </summary>
     public bool OnlineLocked => _localGame.PracticeUsed;
 
-    /// <summary>Opens a room on the relay at <paramref name="hubUrl"/>; the other player joins with its code.</summary>
-    public OnlineMatch CreateOnline(Uri hubUrl, string? accessKey = null)
+    /// <summary>
+    /// Opens a room on the relay at <paramref name="hubUrl"/> for a match of <paramref name="mode"/>; the other
+    /// player joins with its code and plays that game.
+    /// </summary>
+    public OnlineMatch CreateOnline(Uri hubUrl, string? accessKey = null, GameMode mode = GameMode.TrackAndField)
     {
         EnsureOnlineAllowed();
-        return Online = OnlineMatch.Create(hubUrl, accessKey, _localGame.Localizer);
+        return Online = OnlineMatch.Create(hubUrl, accessKey, _localGame.Localizer, mode);
     }
 
     /// <summary>Joins the room <paramref name="code"/> on the relay at <paramref name="hubUrl"/>.</summary>
