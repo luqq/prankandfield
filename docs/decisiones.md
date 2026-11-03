@@ -55,8 +55,9 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #20 | 3/11 | Botonera táctil: INICIO · SALTAR/LANZAR · CORRER · CORRER, con los dos de correr juntos a la derecha del de saltar |
 | #21 | 3/11 | Carrera automática en el potro y el salto de altura: una pulsación de correr y el atleta corre solo a velocidad fija, como en los arcades originales |
 | #22 | 3/11 | Retoques tras la revisión del #21: el tiempo muerto de 20 s solo cuenta en la marca, la pulsación del trampolín se juzga antes de la zancada, el salto de altura entra en el checksum y la carrera sube a 1000 cm/s para que el último listón de la ronda 4 no exija fotograma exacto |
+| #23 | 3/11 | Jabalina endurecida con la misma mecánica: dial a 75 grados por segundo (pasa justo por 45), la carrera pesa más y una ventana de técnica en torno a 45 (los extremos del dial tiran un tercio); cada ronda pide una pulsación por segundo más |
 
-Todos están fusionados en `main` salvo el #3 y el #14, cerrados sin fusionar, y el #22, abierto el 3/11 (comprobado el 3/11/2026 tras fusionar el #21).
+Todos están fusionados en `main` salvo el #3 y el #14, cerrados sin fusionar, y el #23, abierto el 3/11 (comprobado el 3/11/2026 tras fusionar el #22).
 
 ## Ramas y repos retirados
 
