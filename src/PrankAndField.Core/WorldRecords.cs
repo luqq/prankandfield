@@ -73,7 +73,7 @@ public sealed class WorldRecords
         [new(2.37, "EEE"), new(2.36, "FFF"), new(2.35, "GGG")],     // high jump (Zhu 1983)
         // Hyper Sports: arcade-paced marks (the swim runs about twice as fast as real life)
         [new(24.00, "EEE"), new(24.60, "FFF"), new(25.20, "GGG")],  // 100 m swim (the computer swims about 24.1)
-        [new(20, "EEE"), new(19, "FFF"), new(18, "GGG")],           // skeet (hits out of 20)
+        [new(19, "EEE"), new(18, "FFF"), new(17, "GGG")],           // skeet (hits out of 20: a clean round beats the board)
         [new(9.90, "EEE"), new(9.80, "FFF"), new(9.70, "GGG")],     // long horse (score)
         [new(58, "EEE"), new(56, "FFF"), new(55, "GGG")],           // archery (points, six arrows)
         [new(17.89, "EEE"), new(17.57, "FFF"), new(17.44, "GGG")],  // triple jump (de Oliveira 1975)

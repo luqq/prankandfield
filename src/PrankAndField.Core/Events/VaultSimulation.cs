@@ -218,8 +218,29 @@ public sealed class VaultSimulation : FieldEventSimulation
     protected override void TickAfterAttempt(double dt, Athlete a)
     {
         if (State != VaultState.Landed) return;
-        if (a.Pose != Pose.Fall) a.Pose = Rules.Qualifies(Kind, Round, Score) ? Pose.Celebrate : Pose.Idle;
+        var at = AttemptsFor(a.PlayerIndex)[CurrentTry - 1];
+        if (a.Pose != Pose.Fall) a.Pose = at.Mark is double m && Rules.Qualifies(Kind, Round, m) ? Pose.Celebrate : Pose.Idle;
     }
 
     protected override void OnAttemptCompleted(Athlete a, Attempt result) => a.Runner.Locked = false;
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)State);
+        h.Add(_takeoffX);
+        h.Add(_time);
+        h.Add(_flightDuration);
+        h.Add(_flightHeight);
+        h.Add(_landingDistance);
+        h.Add(_spin);
+        h.Add(_spinTarget);
+        h.Add(_lastButton);
+        h.Add(BoardQuality);
+        h.Add(PushQuality);
+        h.Add(Stuck);
+        h.Add(_stickTried);
+        h.Add(_foulTimer);
+        h.Add(Score);
+    }
 }

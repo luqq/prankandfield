@@ -260,7 +260,10 @@ public static class Rules
     public const double VaultStickScore = 0.3;
     public const double VaultHalfTwistPenalty = 1.0;
 
-    /// <summary>Judges' score: 5.5 base, up to 1.2 for the board, 1.2 for the push, 2.0 for twists and 0.3 for sticking the landing.</summary>
+    /// <summary>
+    /// Judges' score out of 10: 5.0 base, up to 1.5 for the board, 1.5 for the push, 0.5 per whole twist (up to four) and
+    /// 0.3 for sticking the landing; a half twist left over costs 1.0.
+    /// </summary>
     public static double VaultScore(double board, double push, double twists, bool stuck)
     {
         double whole = Math.Floor(twists + 1e-9);
@@ -278,7 +281,7 @@ public static class Rules
     public const double ArcheryTargetSwing = 1.0;      // metres above and below the centre
     public const double ArcheryTargetSpeed = 1.3;      // radians per second for the first arrow
     public const double ArcheryTargetSpeedStep = 0.12; // faster for each later arrow
-    public const double ArcheryTargetRadius = 1.0;     // outer ring
+    public const double ArcheryTargetRadius = 1.1;     // outer edge of the face: ten rings of ArcheryRing
     public const double ArcheryRing = 0.11;            // width of each of the ten rings (10 = centre)
     public const double ArcheryBowHeight = 1.3;        // release height
     public const double ArrowSpeed = 14.0;             // units per second

@@ -40,6 +40,7 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #8 | 25/10 | Fusión de `main-online` en `main`. Desde aquí el online se publica en `luqq.github.io/prankandfield` |
 | #9 | 25/10 | Konami Code para el modo práctica y bloqueo del online tras usarlo; piel morena del J2 |
 | #10 | 25/10 | Longitud: caer antes de la arena (`Rules.LongJumpPitStart` = 1 m tras la tabla) es nulo. Jabalina: el atleta se planta al pulsar lanzar y la marca se mide desde la línea de nulo |
+| #11 | 26/10 | Documentación para agentes: `AGENTS.md`, `docs/` |
 | #12 | 27/10 | Martillo: giro continuo con el lanzador en 3D proyectado (`SpinnerSprite`), órbita inclinada y arco rojo de lanzamiento; se suelta con una sola pulsación, sin ángulo |
 | #13 | 27/10 | Salto de altura rehecho: carrera manual, zona de batida pintada antes del listón, ángulo que sube al mantener saltar y listón que sube 4 cm tras cada salto válido |
 | #15 | 3/11 | Barra de velocidad para cada corredor en las carreras a dos jugadores |

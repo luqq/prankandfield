@@ -82,12 +82,14 @@ public sealed class OnlineMatch : IAsyncDisposable
 
     private async Task RunAsync(string? joinCode)
     {
+        bool creating = joinCode is null;
         try
         {
             await _client.StartAsync(_cts.Token);
             if (joinCode is null)
             {
                 Code = await _client.CreateRoomAsync(Mode, _cts.Token);
+                creating = false;
             }
             else
             {
@@ -109,8 +111,9 @@ public sealed class OnlineMatch : IAsyncDisposable
         }
         catch (NotSupportedException)
         {
-            // The relay predates game modes (or is newer than this game): say so in the player's language.
-            Error = _localizer["online.mode_unsupported"];
+            // Creating the room failed: the relay predates game modes. Otherwise the relay announced a game this
+            // build does not know: it is the game that is out of date.
+            Error = _localizer[creating ? "online.mode_unsupported" : "online.game_outdated"];
             Status = OnlineStatus.Failed;
         }
         catch (Exception ex)

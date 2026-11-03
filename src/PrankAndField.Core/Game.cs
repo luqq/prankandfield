@@ -600,42 +600,7 @@ public sealed class Game
             h.Add(p.CurrentMark ?? -1);
             foreach (char c in p.Name) h.Add(c);
         }
-        if (Simulation is { } sim)
-        {
-            h.Add(sim.Elapsed);
-            h.Add(sim.IsFinished);
-            h.Add(sim.BonusPoints[0]);
-            h.Add(sim.BonusPoints[1]);
-            foreach (var a in sim.Athletes)
-            {
-                h.Add(a.X);
-                h.Add(a.Y);
-                h.Add(a.Runner.SpeedCm);
-                h.Add((int)a.Pose);
-            }
-        }
+        Simulation?.AddChecksum(ref h);
         return h.Value;
-    }
-
-    /// <summary>FNV-1a over the raw bits of each value.</summary>
-    private struct StateHash
-    {
-        public ulong Value = 14695981039346656037UL;
-
-        public StateHash() { }
-
-        public void Add(long v)
-        {
-            for (int i = 0; i < 8; i++)
-            {
-                Value ^= (byte)(v >> (8 * i));
-                Value *= 1099511628211UL;
-            }
-        }
-
-        public void Add(int v) => Add((long)v);
-        public void Add(uint v) => Add((long)v);
-        public void Add(bool v) => Add(v ? 1L : 0L);
-        public void Add(double v) => Add(BitConverter.DoubleToInt64Bits(v));
     }
 }

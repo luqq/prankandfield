@@ -346,8 +346,10 @@ public static class EventRenderers
         Stadium.DrawStands(dl, scrollForStands, time);
         Stadium.DrawWall(dl, loc[sw.Kind.Key()], game.Round);
 
-        var human = sw.Athletes.FirstOrDefault(a => !a.IsCpu) ?? sw.Athletes[0];
-        Hud.DrawSpeedBar(dl, game, human.Runner.SpeedCm, null, Rules.SwimMaxSpeed * 1.1);
+        // bottom bar: the human speed; with two human swimmers (local two-player or online) each gets a bar.
+        var humans = sw.Athletes.Where(a => !a.IsCpu).OrderBy(a => a.PlayerIndex).ToList();
+        if (humans.Count >= 2) Hud.DrawSpeedBars(dl, game, humans, Rules.SwimMaxSpeed * 1.1);
+        else Hud.DrawSpeedBar(dl, game, (humans.Count == 1 ? humans[0] : sw.Athletes[0]).Runner.SpeedCm, null, Rules.SwimMaxSpeed * 1.1);
 
         string banner = sw.Phase switch
         {
@@ -410,7 +412,7 @@ public static class EventRenderers
         Stadium.DrawWall(dl, loc[sk.Kind.Key()], game.Round);
         Hud.DrawSpeedBar(dl, game, sk.SpeedReadout(a.PlayerIndex),
             loc.Format("hud.target", Math.Min(sk.Launched, Rules.SkeetTargets), Rules.SkeetTargets) + "   " + loc.Format("hud.streak", sk.Streak),
-            Rules.SkeetTargets * 150, loc["hud.hits"] + "=");
+            Rules.SkeetTargets * 150, loc["hud.hits"] + "=", sk.Hits.ToString());
         PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, $"{sk.Hits} {loc["hud.hits"]}", Palette.White, 1, TextAlign.Right);
         DrawTurnBanner(dl, game, sk);
     }
@@ -427,8 +429,10 @@ public static class EventRenderers
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in v.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
-        // in the handstand the sprite is upside down: lift the anchor so the hands rest on the horse top
-        double ay = ground - a.Y * Layout.PxPerMeterY - (a.Pose == Pose.Handstand ? 14 : 0);
+        // the sprite turns about its middle, so upside down the hands end up just under the anchor: lift it a
+        // touch as the body turns over so they rest on the horse top instead of sinking into the padding
+        double lift = v.State is VaultState.PreFlight or VaultState.OnHorse ? 3 * Math.Clamp(a.Rotation / 180, 0, 1) : 0;
+        double ay = ground - a.Y * Layout.PxPerMeterY - lift;
         AthleteSprite.Draw(dl, ax, ay, a, time);
         if (v.State == VaultState.OnHorse)
             Hud.DrawPrompt(dl, ax, Layout.FieldTop + 6, loc["hud.push"], Palette.HudYellow, 1 - Math.Clamp(v.HorseTime / Rules.VaultPushAuto, 0, 1));
@@ -438,8 +442,13 @@ public static class EventRenderers
         Stadium.DrawStands(dl, camera * Layout.PxPerMeterX, time);
         Stadium.DrawWall(dl, loc[v.Kind.Key()], game.Round);
         bool flying = v.State is VaultState.PreFlight or VaultState.OnHorse or VaultState.Flight or VaultState.Landed;
-        string label = flying ? $"{loc["hud.twists"]} {v.Twists.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
-        Hud.DrawSpeedBar(dl, game, v.SpeedReadout(a.PlayerIndex), label.Length > 0 ? label : null, flying ? Rules.VaultMaxTwists * 250 : 1550);
+        if (flying)
+        {
+            // off the board the bar counts twists, not speed
+            string twists = v.Twists.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            Hud.DrawSpeedBar(dl, game, v.SpeedReadout(a.PlayerIndex), null, Rules.VaultMaxTwists * 250, loc["hud.twists"] + "=", twists);
+        }
+        else Hud.DrawSpeedBar(dl, game, v.SpeedReadout(a.PlayerIndex));
         DrawFieldBanner(dl, game, v);
     }
 
@@ -474,28 +483,37 @@ public static class EventRenderers
         }
         dl.Polyline(1.2, Palette.Bow, bow);
         dl.Line(bow[0], bow[8], 0.5, Palette.White);
-        if (ar.State == ArcheryState.Aim) Stadium.DrawArrow(dl, grip.X + fwd.X * 7, grip.Y + fwd.Y * 7, bowAngle, 10);
+        var nocked = new Vec2(grip.X + fwd.X * 7, grip.Y + fwd.Y * 7);
+        if (ar.State == ArcheryState.Aim) Stadium.DrawArrow(dl, nocked.X, nocked.Y, bowAngle, 10);
         if (ar.ArrowVisible)
         {
+            // the simulated path starts at the bow height, the drawn bow sits in the archer's hand: blend one
+            // into the other over the first metre so the arrow leaves the bow instead of appearing beside it
             double sx = shooterX + ar.ArrowX * Layout.ArcheryPxPerMeter;
             double sy = ground - ar.ArrowY * Layout.ArcheryPxPerMeter;
+            double blend = Math.Clamp(ar.ArrowX / 1.0, 0, 1);
+            sx = nocked.X + (sx - nocked.X) * blend;
+            sy = nocked.Y + (sy - nocked.Y) * blend;
             Stadium.DrawArrow(dl, sx, sy, -ar.ArrowAngle, 10);
         }
-        // the points of the last arrow, by the target
+        // the points of the last arrow, over the target and under the running total
         if (ar.State == ArcheryState.Scored)
         {
             string text = ar.LastPoints > 0 ? ar.LastPoints.ToString() : loc["hud.miss"];
-            PixelFont.Draw(dl, targetX, Layout.FieldTop + 6, text, ar.LastPoints >= 9 ? Palette.HudYellow : ar.LastPoints > 0 ? Palette.White : Palette.HudRed, 1.3, TextAlign.Center);
+            PixelFont.Draw(dl, targetX, Layout.FieldTop + 18, text, ar.LastPoints >= 9 ? Palette.HudYellow : ar.LastPoints > 0 ? Palette.White : Palette.HudRed, 1.3, TextAlign.Center);
         }
         dl.PopClip();
         Stadium.DrawStands(dl, 0, time);
         Stadium.DrawWall(dl, loc[ar.Kind.Key()], game.Round);
-        // wind box, top left
-        dl.FillRect(6, Layout.FieldTop + 4, 46, 11, Palette.Black.WithAlpha(210));
+        // wind box, top left, as wide as its words (VIENTO is longer than WIND)
         string windArrow = ar.Wind > 0.05 ? "↑" : ar.Wind < -0.05 ? "↓" : "-";
-        PixelFont.Draw(dl, 9, Layout.FieldTop + 6, loc["hud.wind"], Palette.HudCyan, 0.7);
-        PixelFont.Draw(dl, 49, Layout.FieldTop + 6, windArrow + " " + Math.Abs(ar.Wind).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), Palette.White, 0.7, TextAlign.Right);
-        Hud.DrawSpeedBar(dl, game, ar.SpeedReadout(a.PlayerIndex), loc.Format("hud.arrow", Math.Min(ar.ArrowIndex + 1, Rules.ArcheryArrows), Rules.ArcheryArrows), Rules.ArcheryArrows * 10 * 20, loc["hud.pts"] + "=");
+        string windLabel = loc["hud.wind"];
+        string windValue = windArrow + " " + Math.Abs(ar.Wind).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        double windW = 3 + PixelFont.Measure(windLabel, 0.7) + 5 + PixelFont.Measure(windValue, 0.7) + 3;
+        dl.FillRect(6, Layout.FieldTop + 4, windW, 11, Palette.Black.WithAlpha(210));
+        PixelFont.Draw(dl, 9, Layout.FieldTop + 6, windLabel, Palette.HudCyan, 0.7);
+        PixelFont.Draw(dl, 6 + windW - 3, Layout.FieldTop + 6, windValue, Palette.White, 0.7, TextAlign.Right);
+        Hud.DrawSpeedBar(dl, game, ar.SpeedReadout(a.PlayerIndex), loc.Format("hud.arrow", Math.Min(ar.ArrowIndex + 1, Rules.ArcheryArrows), Rules.ArcheryArrows), Rules.ArcheryArrows * 10 * 20, loc["hud.pts"] + "=", ar.Points.ToString());
         PixelFont.Draw(dl, Screen.Width - 6, Layout.FieldTop + 4, $"{ar.Points} {loc["hud.pts"]}", Palette.White, 1, TextAlign.Right);
         if (ar.ShowAngle) Hud.DrawAngleBox(dl, shooterX + 30, Layout.FieldBottom - 13, ar.Angle);
         DrawTurnBanner(dl, game, ar);

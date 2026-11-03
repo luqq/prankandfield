@@ -87,14 +87,28 @@ public class RelayTests(WebApplicationFactory<Program> factory) : IClassFixture<
         // A raw connection, because RelayClient refuses to send an undefined mode in the first place.
         await using var raw = new HubConnectionBuilder().WithUrl(new Uri(factory.Server.BaseAddress, MatchHub.Path), UseTestServer).Build();
         await raw.StartAsync();
-        await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", 7));
+        var badMode = await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", 7));
         await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", -1));
+        Assert.False(RelayClient.IsUnknownHubMethod(badMode), badMode.Message);
         // ...and still opens the known ones through either call.
         Assert.Equal(RoomRegistry.CodeLength, (await raw.InvokeAsync<RoomCreated>("CreateRoomWithMode", MatchHub.HyperSportsMode)).Code.Length);
 
         await using var client = await ConnectAsync();
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => client.CreateRoomAsync((GameMode)7));
         Assert.Equal(RoomRegistry.CodeLength, (await client.CreateRoomAsync()).Length);
+    }
+
+    [Fact]
+    public async Task ARelayWithoutGameModesIsToldApart()
+    {
+        // A relay older than game modes has no CreateRoomWithMode: the call fails while the server binds the
+        // arguments of a method it does not know. The same happens here with a method this relay never had.
+        await using var raw = new HubConnectionBuilder().WithUrl(new Uri(factory.Server.BaseAddress, MatchHub.Path), UseTestServer).Build();
+        await raw.StartAsync();
+        var missing = await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomWithModeAndSeed", MatchHub.HyperSportsMode));
+        Assert.True(RelayClient.IsUnknownHubMethod(missing), missing.Message);
+        var missingNoArgs = await Assert.ThrowsAsync<HubException>(() => raw.InvokeAsync<RoomCreated>("CreateRoomV2"));
+        Assert.True(RelayClient.IsUnknownHubMethod(missingNoArgs), missingNoArgs.Message);
     }
 
     [Fact]

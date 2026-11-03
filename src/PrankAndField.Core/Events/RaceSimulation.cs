@@ -237,6 +237,17 @@ public abstract class RaceSimulation : EventSimulation
         a.Pose = CoastingPose(a);
     }
 
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)Phase);
+        h.Add(RaceTime);
+        h.Add(_phaseTimer);
+        h.Add(_restartCount);
+        h.Add(_cpuTarget[0]);
+        h.Add(_cpuTarget[1]);
+    }
+
     /// <summary>Per-event motion hook (hurdle jumping, breathing). <paramref name="e"/> is null for the computer.</summary>
     protected virtual void TickAthleteMotion(Athlete a, ButtonEdges? e, double dt) { }
 

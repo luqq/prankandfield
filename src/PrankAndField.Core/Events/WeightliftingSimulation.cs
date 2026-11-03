@@ -18,6 +18,7 @@ public enum LiftState
 public sealed class WeightliftingSimulation : FieldEventSimulation
 {
     private readonly double[] _weight = new double[2];
+    private double _onTheBar;
     private int _lastButton;
     private double _cleanTime;
     private double _jerkTimer;
@@ -34,7 +35,11 @@ public sealed class WeightliftingSimulation : FieldEventSimulation
     protected override double StartX => 0;
 
     public LiftState State { get; private set; }
-    public double Weight => _weight[CurrentAthlete.PlayerIndex];
+
+    /// <summary>Kilograms on the bar now: the current athlete's weight, still the one just lifted while the lights show.</summary>
+    public double Weight => Phase == AttemptPhase.Result && State == LiftState.Lifted ? _onTheBar : _weight[CurrentAthlete.PlayerIndex];
+
+    /// <summary>Kilograms the player's next lift will be.</summary>
     public double WeightFor(int playerIndex) => _weight[playerIndex];
 
     /// <summary>Power built up by the presses and the power the bar needs (the clean completes at 1.0).</summary>
@@ -70,7 +75,16 @@ public sealed class WeightliftingSimulation : FieldEventSimulation
     /// <summary>White lights lit by the judges (3 on a good lift).</summary>
     public int Lights { get; private set; }
 
-    public override double SpeedReadout(int playerIndex) => State is LiftState.Ready or LiftState.Clean ? PowerFraction * 1500 : State == LiftState.Hold ? HoldProgress * 1500 : 1500;
+    public override double SpeedReadout(int playerIndex) => State switch
+    {
+        LiftState.Ready or LiftState.Clean => PowerFraction * 1500,
+        LiftState.Hold => HoldProgress * 1500,
+        LiftState.Dropped => 0,
+        _ => 1500,
+    };
+
+    /// <summary>Only a lifter still gripping the bar can be timed out; once the clean starts, the lift's own clocks decide.</summary>
+    protected override bool AttemptIsIdle => State == LiftState.Ready;
 
     protected override void BeginAttempt(Athlete a)
     {
@@ -197,6 +211,7 @@ public sealed class WeightliftingSimulation : FieldEventSimulation
         Cue(AudioCue.SfxLights);
         int p = a.PlayerIndex;
         double lifted = _weight[p];
+        _onTheBar = lifted;
         _weight[p] = Rules.Snap(_weight[p] + Rules.WeightStep);
         CompleteAttempt(Attempt.Of(lifted), 2.6);
     }
@@ -216,4 +231,21 @@ public sealed class WeightliftingSimulation : FieldEventSimulation
     }
 
     protected override void OnAttemptCompleted(Athlete a, Attempt result) => a.Runner.Locked = false;
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)State);
+        h.Add(_weight[0]);
+        h.Add(_weight[1]);
+        h.Add(Power);
+        h.Add(_lastButton);
+        h.Add(_cleanTime);
+        h.Add(_jerkTimer);
+        h.Add(_holdTime);
+        h.Add(_driftTimer);
+        h.Add(_drift);
+        h.Add(Balance);
+        h.Add(Lights);
+    }
 }

@@ -188,6 +188,38 @@ public sealed class SkeetSimulation : TurnEventSimulation
         Critters.Add(new FieldCritter("clay", target.X, target.Y, 0.7));
         Cue(AudioCue.SfxClayBreak);
         if (target.Golden) AwardPlainBonus(a.PlayerIndex, Rules.BonusPoints);
-        else if (Streak % Rules.SkeetStreakBonusEvery == 0) AwardPlainBonus(a.PlayerIndex, Rules.SkeetStreakBonus);
+        if (Streak % Rules.SkeetStreakBonusEvery == 0) AwardPlainBonus(a.PlayerIndex, Rules.SkeetStreakBonus);
+    }
+
+    /// <summary>The last muzzle flash fades out while the total is on screen.</summary>
+    protected override void TickAfterTurn(double dt, Athlete a)
+    {
+        for (int g = 0; g < 2; g++)
+        {
+            if (_flash[g] > 0) _flash[g] -= dt;
+        }
+    }
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add(_launched);
+        h.Add(_nextLaunch);
+        h.Add(Hits);
+        h.Add(Shots);
+        h.Add(Streak);
+        h.Add(Facing);
+        h.Add(_reload[0]);
+        h.Add(_reload[1]);
+        foreach (var t in Targets)
+        {
+            h.Add(t.Index);
+            h.Add(t.Side);
+            h.Add(t.Golden);
+            h.Add(t.X);
+            h.Add(t.Y);
+            h.Add(t.Age);
+            h.Add(t.Hit);
+        }
     }
 }

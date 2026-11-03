@@ -39,11 +39,24 @@ public sealed class SwimmingSimulation : RaceSimulation
     public int Breaths(int playerIndex) => _breaths[playerIndex];
     public int MissedBreaths(int playerIndex) => _missed[playerIndex];
 
-    protected override Pose MovingPose(Athlete a) => _breathAnim[a.PlayerIndex] > 0 || _chokeTimer[a.PlayerIndex] > 0 ? Pose.Breathe : Pose.Swim;
+    protected override Pose MovingPose(Athlete a) =>
+        a.Finished && a.Runner.SpeedCm <= 0 && !a.Disqualified ? Pose.Celebrate
+        : _breathAnim[a.PlayerIndex] > 0 || _chokeTimer[a.PlayerIndex] > 0 ? Pose.Breathe : Pose.Swim;
 
     protected override Pose CoastingPose(Athlete a) => a.Runner.SpeedCm <= 0 && !a.Disqualified ? Pose.Celebrate : Pose.Swim;
 
     protected override void OnGun() => Cue(AudioCue.SfxSplash);
+
+    /// <summary>The wall stops the swimmer: no gliding onto the deck, and no more breath prompts.</summary>
+    protected override void OnAthleteFinished(Athlete a)
+    {
+        int p = a.PlayerIndex;
+        a.X = Distance;
+        a.Runner.SpeedCm = 0;
+        _breathWindow[p] = 0;
+        _breathAnim[p] = 0;
+        _chokeTimer[p] = 0;
+    }
 
     protected override void ResetCourse()
     {
@@ -84,6 +97,7 @@ public sealed class SwimmingSimulation : RaceSimulation
                 a.Runner.SpeedCm *= Rules.SwimChokeFactor;
                 a.LockTimer = Rules.SwimChokeLock;
                 _chokeTimer[p] = Rules.SwimChokeLock;
+                a.Pose = Pose.Breathe;
                 _missed[p]++;
                 Cue(AudioCue.SfxGasp);
             }
@@ -101,6 +115,20 @@ public sealed class SwimmingSimulation : RaceSimulation
                 // Breathing with no prompt costs a bit of speed.
                 a.Runner.SpeedCm *= Rules.SwimWastedBreathFactor;
             }
+        }
+    }
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        for (int p = 0; p < 2; p++)
+        {
+            h.Add(_breathTimer[p]);
+            h.Add(_breathWindow[p]);
+            h.Add(_breathAnim[p]);
+            h.Add(_chokeTimer[p]);
+            h.Add(_breaths[p]);
+            h.Add(_missed[p]);
         }
     }
 }

@@ -419,22 +419,22 @@ public static class Stadium
             dl.FillRect(sx, waterTop + 2, 1, waterH - 4, Palette.WaterDark);
             if (m > 0 && m < finishM) PixelFont.Draw(dl, sx + 2, waterTop + waterH - 6, ((int)m).ToString(), Palette.WaterLight, 0.5);
         }
-        // start wall with the block and the lane number
+        // start wall with the block and the lane number; the deck runs from the wall to the edge of the screen
         double startX = Layout.ToScreenX(0, cameraX);
-        if (startX > -40 && startX < Screen.Width)
+        if (startX > 0 && startX < Screen.Width)
         {
-            dl.FillRect(startX - 40, top, 40, h, Palette.PoolDeck.Darker(0.85));
+            dl.FillRect(0, top, startX, h, Palette.PoolDeck.Darker(0.85));
             dl.FillRect(startX - 1, waterTop, 1.5, waterH, Palette.White);
             dl.FillRect(startX - 7, waterTop - 6, 7, 6, Palette.White);
             dl.FillRect(startX - 16, waterTop + waterH / 2 - 5, 10, 10, Palette.White);
             PixelFont.Draw(dl, startX - 11, waterTop + waterH / 2 - 3.5, laneNumber.ToString(), Palette.Black, 1, TextAlign.Center);
             PixelFont.Draw(dl, startX + 14, top + 1.5, laneLabel, labelColor, 1);
         }
-        // finish wall and the yellow touch pad
+        // finish wall and the yellow touch pad; past the wall there is only deck
         double fx = Layout.ToScreenX(finishM, cameraX);
         if (fx > -10 && fx < Screen.Width + 10)
         {
-            dl.FillRect(fx, top, 40, h, Palette.PoolDeck.Darker(0.85));
+            dl.FillRect(fx, top, Math.Max(0, Screen.Width - fx), h, Palette.PoolDeck.Darker(0.85));
             dl.FillRect(fx - 1.5, waterTop, 2, waterH, Palette.HudYellow);
             dl.FillRect(fx - 2, waterTop - 6, 1.2, 6, Palette.White);
             dl.FillRect(fx - 2, waterTop - 6, 7, 3, Palette.FlagRed);

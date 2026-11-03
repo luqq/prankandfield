@@ -83,7 +83,11 @@ distintas durante un rato. Reglas que se han seguido al añadir el juego a la sa
 - Añadir campos nuevos al final de los mensajes del servidor (`MatchStarted.mode`): los clientes viejos los
   ignoran y los nuevos tratan su ausencia como Prank & Field.
 - Juego nuevo + servidor viejo: Prank & Field online sigue funcionando; crear una sala de Hyper Sports falla con
-  el aviso `online.mode_unsupported` en vez de empezar una partida que se desincronizaría.
+  el aviso `online.mode_unsupported` en vez de empezar una partida que se desincronizaría. El servidor viejo
+  responde «Method does not exist» al no poder enlazar los argumentos de un método que no tiene
+  (`RelayClient.IsUnknownHubMethod`, con test en `RelayTests`).
+- Juego viejo + servidor nuevo: si el servidor anuncia un modo que el juego no conoce, el invitado ve
+  `online.game_outdated` (recargar la página) en vez de jugar otra cosa.
 - Dos clientes de versiones distintas en la misma sala se detectan por el checksum, como cualquier otra
   divergencia; el módulo JS versionado (`prankandfield.js?v=`) reduce ese caso a una recarga.
 

@@ -251,15 +251,23 @@ public static class Hud
         }
     }
 
-    /// <summary>Bottom bar: SPEED= blocks and the numeric cm/sec readout. <paramref name="maxCm"/> fills the bar.</summary>
-    public static void DrawSpeedBar(DrawList dl, Game game, double speedCm, string? extraLabel = null, double maxCm = 1550, string? title = null)
+    /// <summary>
+    /// Bottom bar: SPEED= blocks and the numeric cm/sec readout. <paramref name="maxCm"/> fills the bar. An event
+    /// that measures something else passes its own <paramref name="title"/> (HITS=, POWER=...): the bar then shows
+    /// <paramref name="readout"/> instead of the cm/sec figure, or nothing.
+    /// </summary>
+    public static void DrawSpeedBar(DrawList dl, Game game, double speedCm, string? extraLabel = null, double maxCm = 1550, string? title = null, string? readout = null)
     {
         var loc = game.Localizer;
         double top = Layout.BottomTop;
         dl.FillRect(0, top, Screen.Width, Screen.Height - top, Palette.Black);
-        PixelFont.Draw(dl, 4, top + 5, title ?? loc["hud.speed"], Palette.White, 0.9);
-        DrawSpeedBlocks(dl, 44, top + 4, 8, speedCm, maxCm);
-        DrawSpeedReadout(dl, loc, 206, top + 4.5, 1, speedCm);
+        string shown = title ?? loc["hud.speed"];
+        PixelFont.Draw(dl, 4, top + 5, shown, Palette.White, 0.9);
+        // the blocks start after the title, wherever it ends (AGUANTA= is wider than SPEED=)
+        double blocksX = Math.Max(44, 4 + PixelFont.Measure(shown, 0.9) + 4);
+        DrawSpeedBlocks(dl, blocksX, top + 4, 8, speedCm, maxCm);
+        if (title is null) DrawSpeedReadout(dl, loc, 206, top + 4.5, 1, speedCm);
+        else if (readout is not null) PixelFont.Draw(dl, 206, top + 4.5, readout, Palette.White, 1, TextAlign.Right);
         if (extraLabel is not null) PixelFont.Draw(dl, 4, top + 15, extraLabel, Palette.HudOrange, 0.75);
     }
 
@@ -267,7 +275,7 @@ public static class Hud
     /// Bottom bar of a heat run by two human players at once: one row per runner (1UP above 2UP, like the
     /// scoreboard), each with its own blocks and cm/sec readout, so both players can watch their own rhythm.
     /// </summary>
-    public static void DrawSpeedBars(DrawList dl, Game game, IReadOnlyList<Athlete> runners)
+    public static void DrawSpeedBars(DrawList dl, Game game, IReadOnlyList<Athlete> runners, double maxCm = 1550)
     {
         var loc = game.Localizer;
         double top = Layout.BottomTop;
@@ -279,7 +287,7 @@ public static class Hud
             double y = top + 2 + i * 10;
             var color = a.PlayerIndex == 0 ? Palette.HudCyan : Palette.HudPink;
             PixelFont.Draw(dl, 42, y + 0.75, loc.Format("hud.player", a.PlayerIndex + 1), color, 0.75);
-            DrawSpeedBlocks(dl, 60, y, 7, a.Runner.SpeedCm);
+            DrawSpeedBlocks(dl, 60, y, 7, a.Runner.SpeedCm, maxCm);
             DrawSpeedReadout(dl, loc, 219, y + 0.5, 0.9, a.Runner.SpeedCm);
         }
     }

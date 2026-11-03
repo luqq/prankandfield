@@ -172,11 +172,6 @@ public static class Scenes
         PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 28, loc[game.CurrentEvent.Key()], Palette.HudYellow, 1.4, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2 - 36, Layout.FieldTop + 46, loc["hud.qualify"], Palette.HudGreen, 1, TextAlign.Right);
         Hud.DrawMark(dl, Screen.Width / 2 - 28, Layout.FieldTop + 46, game.CurrentEvent, Rules.QualifyingMark(game.CurrentEvent, game.Round), loc, Palette.HudCyan, Palette.HudGreen, 1);
-        // instructions, wrapped on two lines if long
-        string instr = loc[game.CurrentEvent.InstructionKey()];
-        var lines = Wrap(instr, 52);
-        for (int i = 0; i < lines.Count && i < 3; i++)
-            PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 62 + i * 8, lines[i], Palette.White, 0.7, TextAlign.Center);
         var a = DemoP1;
         a.Pose = game.CurrentEvent switch
         {
@@ -213,17 +208,23 @@ public static class Scenes
         }
         else
         {
+            // the sprite turns about its middle: upside down (the handstand) its hands land 2 px under the anchor
             a.Rotation = game.CurrentEvent == EventKind.LongHorse ? 180 : 0;
             double introY = game.CurrentEvent switch
             {
                 EventKind.Swimming100m => Layout.FieldTop + 86,
-                EventKind.LongHorse => Layout.FieldTop + 72,
+                EventKind.LongHorse => Layout.FieldTop + 98,
                 _ => Layout.FieldTop + 96,
             };
             AthleteSprite.Draw(dl, 36, introY, a, time);
             a.Rotation = 0;
             if (game.CurrentEvent == EventKind.Weightlifting) Stadium.DrawBarbell(dl, 36, introY - 29, 0, Rules.QualifyingMark(EventKind.Weightlifting, game.Round));
         }
+        // instructions, wrapped on up to three lines, over the athlete when a long line reaches it
+        string instr = loc[game.CurrentEvent.InstructionKey()];
+        var lines = Wrap(instr, 52);
+        for (int i = 0; i < lines.Count && i < 3; i++)
+            PixelFont.Draw(dl, Screen.Width / 2, Layout.FieldTop + 62 + i * 8, lines[i], Palette.White, 0.7, TextAlign.Center);
     }
 
     public static void DrawOutcome(DrawList dl, Game game, double time)

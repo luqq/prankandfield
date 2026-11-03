@@ -62,6 +62,26 @@ public class SwimmingTests
         SimulationRunner.RunUntilFinished(sim, s => (b1.NextForSimulation(s), b2.NextForSimulation(s)));
         Assert.True(sim.MarkFor(0) < sim.MarkFor(1), $"P1 {sim.MarkFor(0)} P2 {sim.MarkFor(1)}");
     }
+
+    [Fact]
+    public void TheWallStopsTheSwimmerAndThePrompts()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11);
+        var a = sim.AthleteFor(0)!;
+        bool promptAfterFinish = false;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            if (a.Finished && sim.BreathPrompt(0)) promptAfterFinish = true;
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
+        Assert.True(a.Finished);
+        Assert.Equal(Rules.SwimDistance, a.X);
+        Assert.Equal(0, a.Runner.SpeedCm);
+        Assert.False(promptAfterFinish, "no BREATHE prompt after touching the pad");
+        Assert.Equal(Pose.Celebrate, a.Pose);
+    }
+
 }
 
 public class SkeetTests
@@ -129,6 +149,38 @@ public class SkeetTests
         Assert.NotNull(sim.MarkFor(0));
         Assert.NotNull(sim.MarkFor(1));
     }
+
+    [Fact]
+    public void AHitIsInTheChecksum()
+    {
+        // same seed, same clays: one shooter fires at the first clay in a sight, the other just watches
+        var shooter = New();
+        var watcher = New();
+        var none = new ButtonEdges();
+        int gun = -1;
+        for (int i = 0; i < 60 * 10 && gun < 0; i++)
+        {
+            shooter.Tick(Game.TickSeconds, none, none);
+            watcher.Tick(Game.TickSeconds, none, none);
+            gun = shooter.TargetInSight(0) ? 0 : shooter.TargetInSight(1) ? 1 : -1;
+        }
+        Assert.True(gun >= 0, "a clay reaches a sight");
+        var fire = new ButtonEdges();
+        fire.Update(new InputFrame(Run1: gun == 0, Run2: gun == 1));
+        shooter.Tick(Game.TickSeconds, fire, none);
+        watcher.Tick(Game.TickSeconds, none, none);
+        Assert.Equal(1, shooter.Hits);
+        Assert.Equal(0, watcher.Hits);
+        Assert.NotEqual(Checksum(shooter), Checksum(watcher));
+    }
+
+    private static ulong Checksum(EventSimulation sim)
+    {
+        var h = new StateHash();
+        sim.AddChecksum(ref h);
+        return h.Value;
+    }
+
 }
 
 public class VaultTests
@@ -245,7 +297,9 @@ public class ArcheryTests
         Assert.Equal(10, Rules.ArcheryPoints(0.10));
         Assert.Equal(9, Rules.ArcheryPoints(-0.15));
         Assert.Equal(1, Rules.ArcheryPoints(0.99));
+        Assert.Equal(1, Rules.ArcheryPoints(1.05));
         Assert.Equal(0, Rules.ArcheryPoints(1.2));
+        Assert.Equal(Rules.ArcheryTargetRadius, 10 * Rules.ArcheryRing, 9);
     }
 }
 
@@ -308,6 +362,31 @@ public class TripleJumpTests
         SimulationRunner.RunUntilFinished(sim, s => (bot.NextForSimulation(s) with { Action = false }, InputFrame.None));
         Assert.All(sim.AttemptsFor(0), t => Assert.True(t.Foul));
     }
+
+    [Fact]
+    public void ALateTakeoffStartsWhereTheFeetAre()
+    {
+        var late = New();
+        var hopper = new Bot(0, 11);
+        var a = late.AthleteFor(0)!;
+        double maxX = 0;
+        bool wentBack = false;
+        SimulationRunner.RunUntilFinished(late, s =>
+        {
+            if (late.Phase == AttemptPhase.Active && late.State != TripleJumpState.Approach)
+            {
+                if (a.X < maxX - 1e-9) wentBack = true;
+                maxX = Math.Max(maxX, a.X);
+            }
+            else maxX = 0;
+            var f = hopper.NextForSimulation(s);
+            if (late.State == TripleJumpState.Contact) f = f with { Action = false };
+            return (f, InputFrame.None);
+        });
+        Assert.True(late.LateTakeoffs > 0);
+        Assert.False(wentBack, "a phase launched late starts from the landing, never behind it");
+    }
+
 }
 
 public class WeightliftingTests
@@ -370,6 +449,44 @@ public class WeightliftingTests
         // with drift and no corrections most lifts drop; at least one must have dropped from the hold
         Assert.True(sim.AttemptsFor(0).Any(a => a.Foul), "no lift dropped");
     }
+
+    [Fact]
+    public void ALiftUnderWayIsNeverTimedOut()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11);
+        double waited = 0;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            // the lifter grips the bar for 19 seconds before the first try, then lifts for real
+            if (sim.CurrentTry == 1 && sim.State == LiftState.Ready && waited < 19)
+            {
+                waited += Game.TickSeconds;
+                return (InputFrame.None, InputFrame.None);
+            }
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
+        var first = sim.AttemptsFor(0)[0];
+        Assert.False(first.Foul, "the idle limit only applies while the bar is still on the floor");
+        Assert.Equal(Rules.QualifyingMark(EventKind.Weightlifting, 1), first.Mark);
+    }
+
+    [Fact]
+    public void TheBarKeepsTheLiftedWeightWhileTheLightsShow()
+    {
+        var sim = New();
+        var bot = new Bot(0, 11);
+        double q = Rules.QualifyingMark(EventKind.Weightlifting, 1);
+        double? shownWithTheLights = null;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            if (sim.CurrentTry == 1 && sim.Phase == AttemptPhase.Result && sim.State == LiftState.Lifted) shownWithTheLights = sim.Weight;
+            return (bot.NextForSimulation(s), InputFrame.None);
+        });
+        Assert.Equal(q, shownWithTheLights);
+        Assert.Equal(q + 3 * Rules.WeightStep, sim.WeightFor(0));
+    }
+
 }
 
 public class HyperSportsGameTests
@@ -577,7 +694,8 @@ public class HyperSportsRecordsTests
             if (kind.Mode() == GameMode.HyperSports)
                 Assert.True(Rules.IsBetter(kind, row[0].Mark, Rules.QualifyingMark(kind, Rules.MaxRound)), $"{kind} record should beat the toughest standard");
         }
-        Assert.Equal(20, r.Best(EventKind.SkeetShooting).Mark);
+        Assert.Equal(19, r.Best(EventKind.SkeetShooting).Mark);
+        Assert.True(Rules.IsBetter(EventKind.SkeetShooting, Rules.SkeetTargets, r.Best(EventKind.SkeetShooting).Mark), "a perfect round sets a record");
         Assert.Equal(9.90, r.Best(EventKind.LongHorse).Mark);
     }
 

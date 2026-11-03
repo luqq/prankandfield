@@ -95,7 +95,12 @@ public sealed class TripleJumpSimulation : FieldEventSimulation
                     a.X = _takeoffX + _phaseDistance * p;
                     a.Y = 4 * Math.Max(0.5, _phaseDistance * 0.18) * p * (1 - p);
                     a.Pose = JumpPhase < 2 ? (p < 0.6 ? Pose.Jump : Pose.Land) : (p < 0.7 ? Pose.Fly : Pose.Land);
-                    if (p >= 1) TouchDown(a);
+                    if (p >= 1)
+                    {
+                        TouchDown(a);
+                        // a press on the very tick the feet touch the ground counts for the next phase
+                        if (State == TripleJumpState.Contact && e.ActionPressed) BeginRising(a);
+                    }
                 }
                 break;
 
@@ -120,7 +125,6 @@ public sealed class TripleJumpSimulation : FieldEventSimulation
 
     private void BeginRising(Athlete a)
     {
-        _takeoffX = a.X;
         State = TripleJumpState.Rising;
         ShowAngle = true;
         Angle = 0;
@@ -130,6 +134,7 @@ public sealed class TripleJumpSimulation : FieldEventSimulation
 
     private void Launch(Athlete a)
     {
+        _takeoffX = a.X; // whether the press came in time or the window ran out, the phase starts where the feet are
         State = TripleJumpState.Flight;
         _flightTime = 0;
         _phaseDistance = Rules.TripleJumpPhaseDistance(JumpPhase, _speed, Angle);
@@ -166,5 +171,22 @@ public sealed class TripleJumpSimulation : FieldEventSimulation
         if (State != TripleJumpState.Landed) return;
         var at = AttemptsFor(a.PlayerIndex)[CurrentTry - 1];
         a.Pose = at.Mark is double m && Rules.Qualifies(Kind, Round, m) ? Pose.Celebrate : (at.Foul ? Pose.Stumble : Pose.Idle);
+    }
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)State);
+        h.Add(JumpPhase);
+        h.Add(LateTakeoffs);
+        h.Add(_flightTime);
+        h.Add(_flightDuration);
+        h.Add(_speed);
+        h.Add(_takeoffX);
+        h.Add(_phaseDistance);
+        h.Add(_contactTimer);
+        h.Add(_foulJump);
+        h.Add(Angle);
+        foreach (var l in _landings) h.Add(l);
     }
 }

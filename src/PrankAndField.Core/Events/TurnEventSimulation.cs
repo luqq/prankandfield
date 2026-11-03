@@ -106,6 +106,17 @@ public abstract class TurnEventSimulation : EventSimulation
     protected virtual void TickAfterTurn(double dt, Athlete a) { }
     protected virtual void OnTurnCompleted(Athlete a, double score) { }
 
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)Phase);
+        h.Add(_turnIndex);
+        h.Add(_phaseTimer);
+        h.Add(_turnTime);
+        h.Add(_scores[0]);
+        h.Add(_scores[1]);
+    }
+
     /// <summary>Pays bonus points without an animal: banner, fanfare and the announcer.</summary>
     protected void AwardPlainBonus(int playerIndex, long points)
     {

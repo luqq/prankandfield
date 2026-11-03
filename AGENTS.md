@@ -12,7 +12,8 @@ tiene **multijugador online 1 contra 1**: lockstep determinista por entradas a t
 SignalR propio. Desde el 27/10/2026 el título ofrece además el modo **Hyper Sports** (la secuela de 1984:
 natación, tiro al plato, potro, tiro con arco, triple salto y halterofilia) con el mismo motor, atletas,
 marcador y tabla de récords; `Game.Mode` (`GameMode`) dice qué modo se juega y cada `EventKind` sabe a cuál
-pertenece. El modo online sigue jugando solo Prank & Field (ver [docs/pendientes.md](docs/pendientes.md)).
+pertenece. Desde el 3/11/2026 el modo online juega ambos modos: quien crea la sala elige el juego y el relay
+lo reparte (ver [docs/arquitectura-multijugador.md](docs/arquitectura-multijugador.md)).
 
 - Juego publicado: <https://luqq.github.io/prankandfield/> (rama `main`).
 - Servidor relay: <https://paf.josecardos.com> (`/hub` para SignalR, `/health` para comprobarlo).

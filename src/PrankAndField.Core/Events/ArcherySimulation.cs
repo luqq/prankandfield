@@ -186,4 +186,26 @@ public sealed class ArcherySimulation : TurnEventSimulation
         State = ArcheryState.Scored;
         _time = 0;
     }
+
+    public override void AddChecksum(ref StateHash h)
+    {
+        base.AddChecksum(ref h);
+        h.Add((int)State);
+        h.Add(ArrowIndex);
+        h.Add(Points);
+        h.Add(_tens);
+        h.Add(Wind);
+        h.Add(_targetPhase);
+        h.Add(_time);
+        h.Add(_launchAngle);
+        h.Add(_holding);
+        h.Add(Angle);
+        h.Add(ArrowX);
+        h.Add(ArrowY);
+        foreach (var st in Stuck)
+        {
+            h.Add(st.Offset);
+            h.Add(st.Points);
+        }
+    }
 }

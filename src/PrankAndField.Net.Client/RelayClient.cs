@@ -82,11 +82,20 @@ public sealed class RelayClient : IAsyncDisposable
         {
             return (await _connection.InvokeAsync<RoomCreated>("CreateRoomWithMode", (int)mode, cancellationToken)).Code;
         }
-        catch (HubException ex) when (ex.Message.Contains("Unknown hub method", StringComparison.OrdinalIgnoreCase))
+        catch (HubException ex) when (IsUnknownHubMethod(ex))
         {
             throw new NotSupportedException("The relay server does not know game modes yet: it must be updated before this mode can be played online.", ex);
         }
     }
+
+    /// <summary>
+    /// True when a hub call failed because the server has no such method: a relay that predates it. The server
+    /// answers "Method does not exist" while binding the arguments of an unknown target (and "Unknown hub method"
+    /// for a call without arguments); a <see cref="HubException"/> thrown by the method itself says something else.
+    /// </summary>
+    public static bool IsUnknownHubMethod(HubException ex) =>
+        ex.Message.Contains("Method does not exist", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("Unknown hub method", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Joins a room as P2. Throws when the code is unknown or the room is already full.</summary>
     public async Task JoinRoomAsync(string code, CancellationToken cancellationToken = default)
