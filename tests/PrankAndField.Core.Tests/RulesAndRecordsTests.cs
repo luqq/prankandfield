@@ -9,6 +9,12 @@ public class RulesTests
     [InlineData(EventKind.Hurdles110m)]
     [InlineData(EventKind.HammerThrow)]
     [InlineData(EventKind.HighJump)]
+    [InlineData(EventKind.Swimming100m)]
+    [InlineData(EventKind.SkeetShooting)]
+    [InlineData(EventKind.LongHorse)]
+    [InlineData(EventKind.Archery)]
+    [InlineData(EventKind.TripleJump)]
+    [InlineData(EventKind.Weightlifting)]
     public void QualifyingStandardsGetHarderEveryRound(EventKind kind)
     {
         for (int round = 1; round < Rules.MaxRound; round++)
@@ -40,6 +46,29 @@ public class RulesTests
         Assert.False(Rules.Qualifies(EventKind.Dash100m, 1, 16.01));
         Assert.True(Rules.Qualifies(EventKind.LongJump, 1, 6.00));
         Assert.False(Rules.Qualifies(EventKind.LongJump, 1, 5.99));
+    }
+
+    [Fact]
+    public void HyperSportsStandardsAndScoringAreSane()
+    {
+        Assert.Equal(32.00, Rules.QualifyingMark(EventKind.Swimming100m, 1));
+        Assert.Equal(14, Rules.QualifyingMark(EventKind.SkeetShooting, 1));
+        Assert.Equal(8.50, Rules.QualifyingMark(EventKind.LongHorse, 1));
+        Assert.Equal(30, Rules.QualifyingMark(EventKind.Archery, 1));
+        Assert.Equal(12.50, Rules.QualifyingMark(EventKind.TripleJump, 1));
+        Assert.Equal(150, Rules.QualifyingMark(EventKind.Weightlifting, 1));
+        Assert.True(Rules.Qualifies(EventKind.SkeetShooting, 1, 14));
+        Assert.False(Rules.Qualifies(EventKind.SkeetShooting, 1, 13));
+        Assert.True(Rules.Qualifies(EventKind.Swimming100m, 1, 31.99));
+        foreach (var kind in GameMode.HyperSports.Events())
+        {
+            double q = Rules.QualifyingMark(kind, 1);
+            Assert.True(Scoring.PointsFor(kind, q) > 0, $"{kind} qualifying mark should score");
+            Assert.Equal(0, Scoring.PointsFor(kind, q) % 10);
+        }
+        Assert.True(Scoring.PointsFor(EventKind.Swimming100m, 25) > Scoring.PointsFor(EventKind.Swimming100m, 30));
+        Assert.True(Scoring.PointsFor(EventKind.Weightlifting, 200) > Scoring.PointsFor(EventKind.Weightlifting, 150));
+        Assert.Equal(24.0, Rules.CpuBestTime(EventKind.Swimming100m));
     }
 
     [Fact]

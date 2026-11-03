@@ -10,23 +10,40 @@ namespace PrankAndField.Engine.Rendering;
 /// <summary>The red-framed scoreboard of the arcade and the in-field readouts (speed bar, angle gauge, banners).</summary>
 public static class Hud
 {
-    /// <summary>Draws a mark the arcade way: big digits, small unit, two decimals ("9 SEC 95", "8 M 90"). Returns width.</summary>
+    /// <summary>The small unit label of a mark: SEC, M, PTS, HITS or KG.</summary>
+    public static string UnitLabel(EventKind kind, Localizer loc) => kind.Unit() switch
+    {
+        MarkUnit.Seconds => loc["hud.sec"],
+        MarkUnit.Metres => loc["hud.m"],
+        MarkUnit.Hits => loc["hud.hits"],
+        MarkUnit.Kilograms => loc["hud.kg"],
+        _ => loc["hud.pts"],
+    };
+
+    /// <summary>
+    /// Draws a mark the arcade way: big digits, small unit, two decimals ("9 SEC 95", "8 M 90"). Whole-number
+    /// marks (hits, points, kilograms) show the digits and the unit only ("18 HITS"). Returns width.
+    /// </summary>
     public static double DrawMark(DrawList dl, double x, double y, EventKind kind, double value, Localizer loc, Rgba digits, Rgba unit, double size = 1, TextAlign align = TextAlign.Left)
     {
         value = Math.Clamp(value, 0, 999.99);
         int whole = (int)Math.Floor(value + 1e-9);
         int cents = (int)Math.Round((value - whole) * 100);
         if (cents >= 100) { cents = 0; whole++; }
+        bool wholeOnly = kind.IsWholeNumber();
+        if (wholeOnly) whole = (int)Math.Round(value);
         string a = whole.ToString(CultureInfo.InvariantCulture);
-        string u = kind.IsTimed() ? loc["hud.sec"] : loc["hud.m"];
+        string u = UnitLabel(kind, loc);
         string b = cents.ToString("00", CultureInfo.InvariantCulture);
         double unitSize = size * 0.55;
-        double w = PixelFont.Measure(a, size) + size + PixelFont.Measure(u, unitSize) + size + PixelFont.Measure(b, size);
+        double w = PixelFont.Measure(a, size) + size + PixelFont.Measure(u, unitSize);
+        if (!wholeOnly) w += size + PixelFont.Measure(b, size);
         double startX = align switch { TextAlign.Center => x - w / 2, TextAlign.Right => x - w, _ => x };
         double cx = startX;
         PixelFont.Draw(dl, cx, y, a, digits, size);
         cx += PixelFont.Measure(a, size) + size;
         PixelFont.Draw(dl, cx, y + (PixelFont.GlyphH * size - PixelFont.GlyphH * unitSize) * 0.5, u, unit, unitSize);
+        if (wholeOnly) return w;
         cx += PixelFont.Measure(u, unitSize) + size;
         PixelFont.Draw(dl, cx, y, b, digits, size);
         return w;
@@ -141,7 +158,13 @@ public static class Hud
             {
                 var p = game.Players[i];
                 if (p.IsOut) continue;
-                entries.Add(($"{i + 1}P {p.Name}", Palette.HudCyan, sim is FieldEventSimulation f && f.CurrentAthlete.PlayerIndex == i));
+                bool turn = sim switch
+                {
+                    FieldEventSimulation f => f.CurrentAthlete.PlayerIndex == i,
+                    TurnEventSimulation t => t.CurrentAthlete.PlayerIndex == i,
+                    _ => false,
+                };
+                entries.Add(($"{i + 1}P {p.Name}", Palette.HudCyan, turn));
             }
         }
         for (int i = 0; i < 4; i++)
@@ -195,9 +218,25 @@ public static class Hud
                 if (current && Math.Sin(time * 8) > 0) PixelFont.Draw(dl, 246, y, "←", Palette.HudRed, small, TextAlign.Right);
             }
         }
-        else
+        else if (sim is TurnEventSimulation turn)
         {
-            for (int i = 0; i < Rules.TriesPerFieldEvent && !game.CurrentEvent.IsTimed(); i++)
+            // one scored turn per player: the totals so far, the current turn blinking
+            int row = 1;
+            for (int i = 0; i < game.PlayerCount && row <= 3; i++)
+            {
+                if (game.Players[i].IsOut) continue;
+                double y = y0 + row * rowH;
+                bool current = turn.CurrentAthlete.PlayerIndex == i && turn.Phase != TurnPhase.Finished;
+                PixelFont.Draw(dl, 136, y, loc.Format("hud.player", i + 1), current ? Palette.HudYellow : Palette.White, small);
+                double? total = turn.MarkFor(i) ?? (current && turn.Phase != TurnPhase.Announce ? turn.RunningScore : null);
+                if (total is double m) DrawMark(dl, 170, y - 0.3, turn.Kind, m, loc, Palette.HudCyan, Palette.HudGreen, small);
+                if (current && Math.Sin(time * 8) > 0) PixelFont.Draw(dl, 246, y, "←", Palette.HudRed, small, TextAlign.Right);
+                row++;
+            }
+        }
+        else if (!game.CurrentEvent.IsTimed() && game.CurrentEvent.IsField())
+        {
+            for (int i = 0; i < Rules.TriesPerFieldEvent; i++)
                 PixelFont.Draw(dl, 136, y0 + (i + 1) * rowH, loc[$"hud.try{i + 1}"], Palette.White, small);
         }
     }
@@ -236,16 +275,24 @@ public static class Hud
         }
     }
 
-    /// <summary>Bottom bar: SPEED= blocks and the numeric cm/sec readout.</summary>
-    public static void DrawSpeedBar(DrawList dl, Game game, double speedCm, string? extraLabel = null)
+    /// <summary>
+    /// Bottom bar: SPEED= blocks and the numeric cm/sec readout. <paramref name="maxCm"/> fills the bar. An event
+    /// that measures something else passes its own <paramref name="title"/> (HITS=, POWER=...): the bar then shows
+    /// <paramref name="readout"/> instead of the cm/sec figure, or nothing.
+    /// </summary>
+    public static void DrawSpeedBar(DrawList dl, Game game, double speedCm, string? extraLabel = null, double maxCm = 1550, string? title = null, string? readout = null)
     {
         var loc = game.Localizer;
         double top = Layout.BottomTop;
         dl.FillRect(0, top, Screen.Width, Screen.Height - top, Palette.Black);
         dl.FillRect(0, top, Screen.Width, 0.8, Palette.HudFrame);
-        PixelFont.Draw(dl, 4, top + 5, loc["hud.speed"], Palette.White, 0.9);
-        DrawSpeedBlocks(dl, 44, top + 4, 8, speedCm);
-        DrawSpeedReadout(dl, loc, 206, top + 4.5, 1, speedCm);
+        string shown = title ?? loc["hud.speed"];
+        PixelFont.Draw(dl, 4, top + 5, shown, Palette.White, 0.9);
+        // the blocks start after the title, wherever it ends (AGUANTA= is wider than SPEED=)
+        double blocksX = Math.Max(44, 4 + PixelFont.Measure(shown, 0.9) + 4);
+        DrawSpeedBlocks(dl, blocksX, top + 4, 8, speedCm, maxCm);
+        if (title is null) DrawSpeedReadout(dl, loc, 206, top + 4.5, 1, speedCm);
+        else if (readout is not null) PixelFont.Draw(dl, 206, top + 4.5, readout, Palette.White, 1, TextAlign.Right);
         if (extraLabel is not null) PixelFont.Draw(dl, 4, top + 15, extraLabel, Palette.HudOrange, 0.75);
     }
 
@@ -253,7 +300,7 @@ public static class Hud
     /// Bottom bar of a heat run by two human players at once: one row per runner (1UP above 2UP, like the
     /// scoreboard), each with its own blocks and cm/sec readout, so both players can watch their own rhythm.
     /// </summary>
-    public static void DrawSpeedBars(DrawList dl, Game game, IReadOnlyList<Athlete> runners)
+    public static void DrawSpeedBars(DrawList dl, Game game, IReadOnlyList<Athlete> runners, double maxCm = 1550)
     {
         var loc = game.Localizer;
         double top = Layout.BottomTop;
@@ -266,15 +313,15 @@ public static class Hud
             double y = top + 2 + i * 10;
             var color = a.PlayerIndex == 0 ? Palette.HudCyan : Palette.HudPink;
             PixelFont.Draw(dl, 42, y + 0.75, loc.Format("hud.player", a.PlayerIndex + 1), color, 0.75);
-            DrawSpeedBlocks(dl, 60, y, 7, a.Runner.SpeedCm);
+            DrawSpeedBlocks(dl, 60, y, 7, a.Runner.SpeedCm, maxCm);
             DrawSpeedReadout(dl, loc, 219, y + 0.5, 0.9, a.Runner.SpeedCm);
         }
     }
 
-    /// <summary>The 24 blocks of the arcade bar (16 yellow, then 8 blue) lit up to the speed; the bar is full at 1550 cm/s.</summary>
-    private static void DrawSpeedBlocks(DrawList dl, double x, double y, double h, double speedCm)
+    /// <summary>The 24 blocks of the arcade bar (16 yellow, then 8 blue) lit up to the speed; the bar is full at <paramref name="maxCm"/>.</summary>
+    private static void DrawSpeedBlocks(DrawList dl, double x, double y, double h, double speedCm, double maxCm = 1550)
     {
-        int lit = (int)Math.Round(Math.Clamp(speedCm / 1550.0, 0, 1) * 24);
+        int lit = (int)Math.Round(Math.Clamp(speedCm / maxCm, 0, 1) * 24);
         for (int i = 0; i < 24; i++)
         {
             var c = i < lit ? (i < 16 ? Palette.HudYellow : Palette.HudBlue) : Palette.HudUnlit;
@@ -304,6 +351,21 @@ public static class Hud
             var c = i < lit ? (i is 3 or 4 ? Palette.HudGreen : Palette.HudYellow) : Palette.HudUnlit;
             dl.FillRect(cx - w / 2 + 2.5 + i * 2.6, y + h - 3.2, 1.8, 1.6, c);
         }
+    }
+
+    /// <summary>A small prompt above an athlete ("BREATHE!", "PRESS!") with an optional bar that shrinks as the window closes.</summary>
+    public static void DrawPrompt(DrawList dl, double cx, double y, string text, Rgba color, double windowLeft = -1)
+    {
+        double size = 0.9;
+        double w = PixelFont.Measure(text, size) + 8;
+        double h = PixelFont.CellH * size + (windowLeft >= 0 ? 5 : 2);
+        double x = Math.Clamp(cx - w / 2, 2, Screen.Width - w - 2);
+        dl.FillRect(x, y, w, h, Palette.Black);
+        Box(dl, x, y, w, h, color);
+        PixelFont.Draw(dl, x + w / 2, y + 2, text, color, size, TextAlign.Center);
+        if (windowLeft >= 0) dl.FillRect(x + 2, y + h - 3, (w - 4) * Math.Clamp(windowLeft, 0, 1), 1.6, color);
+        // a little pointer towards the athlete
+        dl.FillPolygon(color, new Vec2(cx - 2, y + h), new Vec2(cx + 2, y + h), new Vec2(cx, y + h + 3));
     }
 
     /// <summary>Big centered banner over the field (FOUL, GO!, QUALIFIED...).</summary>

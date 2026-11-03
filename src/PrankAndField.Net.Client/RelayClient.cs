@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Http.Connections.Client;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using PrankAndField.Core;
 
 namespace PrankAndField.Net.Client;
 
@@ -14,7 +16,8 @@ public sealed class RelayClient : IAsyncDisposable
     // Wire contract with MatchHub (PrankAndField.Server).
     private sealed record RoomCreated(string Code);
     private sealed record JoinResult(bool Ok, string? Error);
-    private sealed record MatchStart(uint Seed, int Seat, int InputDelay);
+    // Mode is missing from a relay that predates game modes: it only knows Track & Field.
+    private sealed record MatchStart(uint Seed, int Seat, int InputDelay, int Mode = 0);
 
     private readonly HubConnection _connection;
     private readonly RelayTransport _transport;
@@ -34,7 +37,11 @@ public sealed class RelayClient : IAsyncDisposable
             .Build();
         _transport = new RelayTransport(_connection);
 
-        _connection.On<MatchStart>("MatchStarted", m => _match.TrySetResult(new MatchSettings(m.Seed, m.Seat, m.InputDelay)));
+        _connection.On<MatchStart>("MatchStarted", m =>
+        {
+            if (Enum.IsDefined((GameMode)m.Mode)) _match.TrySetResult(new MatchSettings(m.Seed, m.Seat, m.InputDelay, Mode: (GameMode)m.Mode));
+            else _match.TrySetException(new NotSupportedException($"The relay started a match in an unknown game mode ({m.Mode}): update the game."));
+        });
         _connection.On<int, int, int[]>("Input", (seat, firstTick, masks) => _transport.Enqueue(new InputMessage(seat, firstTick, masks)));
         _connection.On<int, int, ulong>("Checksum", (seat, tick, checksum) => _transport.Enqueue(new ChecksumMessage(seat, tick, checksum)));
         _connection.On("OpponentLeft", () =>
@@ -61,9 +68,34 @@ public sealed class RelayClient : IAsyncDisposable
 
     public Task StartAsync(CancellationToken cancellationToken = default) => _connection.StartAsync(cancellationToken);
 
-    /// <summary>Opens a room as P1 and returns its code for the other player.</summary>
-    public async Task<string> CreateRoomAsync(CancellationToken cancellationToken = default) =>
-        (await _connection.InvokeAsync<RoomCreated>("CreateRoom", cancellationToken)).Code;
+    /// <summary>
+    /// Opens a room as P1 for a match of <paramref name="mode"/> and returns its code for the other player.
+    /// A Track &amp; Field room uses the original <c>CreateRoom</c> call, so it works against any relay; the
+    /// other modes need a relay that knows <c>CreateRoomWithMode</c>, otherwise this throws
+    /// <see cref="NotSupportedException"/>.
+    /// </summary>
+    public async Task<string> CreateRoomAsync(GameMode mode = GameMode.TrackAndField, CancellationToken cancellationToken = default)
+    {
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        if (mode == GameMode.TrackAndField) return (await _connection.InvokeAsync<RoomCreated>("CreateRoom", cancellationToken)).Code;
+        try
+        {
+            return (await _connection.InvokeAsync<RoomCreated>("CreateRoomWithMode", (int)mode, cancellationToken)).Code;
+        }
+        catch (HubException ex) when (IsUnknownHubMethod(ex))
+        {
+            throw new NotSupportedException("The relay server does not know game modes yet: it must be updated before this mode can be played online.", ex);
+        }
+    }
+
+    /// <summary>
+    /// True when a hub call failed because the server has no such method: a relay that predates it. The server
+    /// answers "Method does not exist" while binding the arguments of an unknown target (and "Unknown hub method"
+    /// for a call without arguments); a <see cref="HubException"/> thrown by the method itself says something else.
+    /// </summary>
+    public static bool IsUnknownHubMethod(HubException ex) =>
+        ex.Message.Contains("Method does not exist", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("Unknown hub method", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Joins a room as P2. Throws when the code is unknown or the room is already full.</summary>
     public async Task JoinRoomAsync(string code, CancellationToken cancellationToken = default)

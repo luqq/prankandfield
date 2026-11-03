@@ -139,4 +139,31 @@ public abstract class EventSimulation
     /// when nothing is airborne. Drives the rising/falling flight tone.
     /// </summary>
     public virtual double? FlightHeight => null;
+
+    /// <summary>
+    /// Feeds the lockstep checksum with everything that decides the outcome of the event: the athletes
+    /// here, and in the overrides the scores, phases, timers and implements of each event. Overrides call
+    /// the base method first.
+    /// </summary>
+    public virtual void AddChecksum(ref StateHash h)
+    {
+        h.Add(Elapsed);
+        h.Add(IsFinished);
+        h.Add(BonusPoints[0]);
+        h.Add(BonusPoints[1]);
+        foreach (var a in Athletes)
+        {
+            h.Add(a.X);
+            h.Add(a.Y);
+            h.Add(a.Runner.SpeedCm);
+            h.Add(a.Runner.Locked);
+            h.Add((int)a.Pose);
+            h.Add(a.Rotation);
+            h.Add(a.LockTimer);
+            h.Add(a.Finished);
+            h.Add(a.FinishTime);
+            h.Add(a.FalseStarts);
+            h.Add(a.Disqualified);
+        }
+    }
 }
