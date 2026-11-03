@@ -39,8 +39,9 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #12 | 27/10 | Martillo: giro continuo con el lanzador en 3D proyectado (`SpinnerSprite`), órbita inclinada y arco rojo de lanzamiento; se suelta con una sola pulsación, sin ángulo |
 | #13 | 27/10 | Salto de altura rehecho: carrera manual, zona de batida pintada antes del listón, ángulo que sube al mantener saltar y listón que sube 4 cm tras cada salto válido |
 | #15 | 27/10 | Barra de velocidad para cada corredor en las series de dos jugadores |
+| #18 | 03/11 | Jabalina simplificada: dial de 20 a 70 grados a 60 grados por segundo que lanza solo al llegar al tope; marca fijada al soltar, sin bonus por mantener correr en vuelo |
 
-Todos están fusionados en `main` salvo el #3, cerrado sin fusionar (comprobado el 03/11/2026). Siguen abiertos, y no figuran aquí hasta fusionarse, el #14 (gráficos) y el #16 (modo Hyper Sports).
+Todos están fusionados en `main` salvo el #3, cerrado sin fusionar, y el #18, abierto el 03/11 (comprobado el 03/11/2026). Siguen abiertos, y no figuran aquí hasta fusionarse, el #14 (gráficos) y el #16 (modo Hyper Sports).
 
 ## Ramas y repos retirados
 
