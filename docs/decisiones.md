@@ -27,6 +27,7 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | Hyper Sports online (3/11) | Quien crea la sala elige el juego en el panel ONLINE (propuesto el resaltado en el título); el servidor lo guarda en la sala y lo reparte en `MatchStarted { seed, seat, inputDelay, mode }`, y `LockstepSession` arranca `StartOnlineCredit(mode)` en los dos navegadores. El hub conserva `CreateRoom()` (Prank & Field) y añade `CreateRoomWithMode(mode)`; el cliente usa el primero para Prank & Field y el segundo para Hyper Sports | Petición del usuario (3/11). Mantener `CreateRoom()` y un campo nuevo en `MatchStarted` (que los clientes viejos ignoran) evita romper el online de Prank & Field mientras el servidor de la VM no esté actualizado: en ese caso crear una sala de Hyper Sports falla con un aviso claro en vez de desincronizar |
 | Récords de Hyper Sports | La tabla pasa a 12 filas; los JSON de 6 filas guardados antes se cargan y conservan los valores por defecto de las nuevas pruebas | No perder los récords locales de nadie |
 | Calibrado de Hyper Sports | Mínimas y récords ajustados con el bot de los tests (`tests/.../Support/Bot.cs`, 9-16 pulsaciones/s): natación 440 cm/s máx. (11 pulsaciones/s ≈ 24,6 s), triple salto ≈ 2× longitud, potro nota 5 + tabla 1,5 + impulso 1,5 + 0,5 por giro + 0,3 por clavar, pesas +5 kg por levantamiento válido | Que un jugador medio supere la ronda 1 y los récords sean alcanzables pero no triviales |
+| Botones táctiles (3/11) | Orden INICIO · SALTAR/LANZAR · CORRER · CORRER: los dos de correr juntos a la derecha del de saltar, con un hueco mayor entre el de saltar y la pareja | Petición del usuario. Un pulgar salta y el otro alterna la pareja de correr; INICIO, pequeño, queda lejos de la pareja para no pulsarlo sin querer al aporrear |
 
 ## Historia del online (PRs de `luqq/prankandfield`)
 
@@ -50,8 +51,9 @@ Registro de lo que se decidió y por qué, para no volver a discutirlo. Fechas d
 | #17 | 27/10 - 3/11 | Modo Hyper Sports en el título con sus seis pruebas, textos en los 4 idiomas, sonidos, tests y calibrado; desde el 3/11 también online (el creador de la sala elige el juego). Sustituye al borrador #16 |
 | #18 | 3/11 | Jabalina simplificada: dial de 20 a 70 grados a 60 grados por segundo que lanza solo al llegar al tope; marca fijada al soltar, sin bonus por mantener correr en vuelo |
 | #19 | 3/11 | Mejora gráfica rehecha en estilo arcade plano de 1983 (ver Estética): público animado, marcador y vallas publicitarias, campos detallados, partículas de píxel, cielo del título, ceremonia y botón CRT de líneas de barrido, todo con colores lisos y opacos; incluye las seis pruebas de Hyper Sports en el mismo estilo |
+| #20 | 3/11 | Botonera táctil: INICIO · SALTAR/LANZAR · CORRER · CORRER, con los dos de correr juntos a la derecha del de saltar |
 
-Todos están fusionados en `main` salvo el #3 y el #14, cerrados sin fusionar, y el #19, abierto el 3/11 (comprobado el 3/11/2026).
+Todos están fusionados en `main` salvo el #3 y el #14, cerrados sin fusionar, y el #20, abierto el 3/11 (comprobado el 3/11/2026).
 
 ## Ramas y repos retirados
 

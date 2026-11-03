@@ -91,7 +91,7 @@
   color: #000;
 }
 
-.paf-touch-action { border-color: #f8e858; }
+.paf-touch-action { border-color: #f8e858; margin-right: 8px; } /* a wider gap sets the RUN pair apart */
 .paf-touch-start { flex: 0.6; border-color: var(--paf-red); }
 
 .paf-credit {
