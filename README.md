@@ -83,7 +83,8 @@ dotnet run --project src/PrankAndField.Web
 | START | `Enter` or `1` | `2` | Start |
 | Menu up / down | `↑` / `↓` | | D-pad |
 
-Touch buttons appear on coarse-pointer devices. On the title screen `↑`/`↓` (or the run buttons) walk the four
+Touch buttons appear on coarse-pointer devices: START and JUMP / THROW on the left, and the two RUN buttons side by
+side on the right so one thumb can alternate them. On the title screen `↑`/`↓` (or the run buttons) walk the four
 entries of the menu: **Prank & Field** or **Hyper Sports**, each for 1 or 2 players. START (or player 2's START,
 which always picks 2 players) begins the credit in the highlighted mode; the record ticker at the bottom shows
 the records of that mode.

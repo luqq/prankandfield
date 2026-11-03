@@ -96,11 +96,13 @@
             </div>
         }
     </div>
+    @* Touch pad: START and JUMP / THROW on the left for one thumb, the two RUN buttons side by side on the right so the
+       other thumb can alternate them; the small START stays away from the RUN pair so hammering never hits it. *@
     <div class="paf-touch" aria-hidden="true">
-        <button class="paf-touch-btn" data-paf-key="run1">@T("touch.run")</button>
-        <button class="paf-touch-btn paf-touch-action" data-paf-key="action">@T("touch.action")</button>
-        <button class="paf-touch-btn" data-paf-key="run2">@T("touch.run")</button>
         <button class="paf-touch-btn paf-touch-start" data-paf-key="start">@T("touch.start")</button>
+        <button class="paf-touch-btn paf-touch-action" data-paf-key="action">@T("touch.action")</button>
+        <button class="paf-touch-btn paf-touch-run" data-paf-key="run1">@T("touch.run")</button>
+        <button class="paf-touch-btn paf-touch-run" data-paf-key="run2">@T("touch.run")</button>
     </div>
 </div>
 
