@@ -16,12 +16,15 @@ public sealed class Hurdle
 /// 110 metre hurdles: a dash with ten barriers, jumped with the action button. A jump locks the RUN buttons for
 /// <see cref="Rules.HurdleAirTime"/> and costs speed the way the arcade did (300 cm/s at take-off, 200 back on landing),
 /// so the heat is won in the three strides between hurdles, where every press adds <see cref="Rules.HurdleImpulseScale"/>
-/// times the dash impulse.
+/// times the dash impulse. Jumping a little early only clips the hurdle; running into one is a stumble.
 /// </summary>
 public sealed class HurdlesSimulation : RaceSimulation
 {
+    private const double NoLanding = -100;
+
     private readonly double[] _airTime = new double[2];
-    private readonly double[] _takeoffLoss = new double[2];
+    private readonly double[] _takeoffSpeed = new double[2];
+    private readonly double[] _landingX = [NoLanding, NoLanding];
     private readonly int[] _nextHurdle = new int[2];
     private readonly Hurdle[][] _hurdles = new Hurdle[2][];
 
@@ -66,7 +69,8 @@ public sealed class HurdlesSimulation : RaceSimulation
         {
             _hurdles[lane] = MakeHurdles();
             _airTime[lane] = 0;
-            _takeoffLoss[lane] = 0;
+            _takeoffSpeed[lane] = 0;
+            _landingX[lane] = NoLanding;
             _nextHurdle[lane] = 0;
         }
     }
@@ -100,9 +104,8 @@ public sealed class HurdlesSimulation : RaceSimulation
         if (wantsJump && _airTime[p] <= 0 && a.LockTimer <= 0 && !a.Finished)
         {
             _airTime[p] = Rules.HurdleAirTime;
-            double airborne = AirborneSpeed(a.Runner.SpeedCm);
-            _takeoffLoss[p] = a.Runner.SpeedCm - airborne;
-            a.Runner.SpeedCm = airborne;
+            _takeoffSpeed[p] = a.Runner.SpeedCm;
+            a.Runner.SpeedCm = AirborneSpeed(a.Runner.SpeedCm);
             a.Runner.Locked = true;
             a.Pose = Pose.Hurdle;
             Cue(AudioCue.SfxJump);
@@ -113,16 +116,7 @@ public sealed class HurdlesSimulation : RaceSimulation
             _airTime[p] -= dt;
             double progress = 1 - _airTime[p] / Rules.HurdleAirTime;
             a.Y = 4 * JumpHeight * progress * (1 - progress);
-            if (_airTime[p] <= 0)
-            {
-                _airTime[p] = 0;
-                a.Y = 0;
-                a.Runner.Locked = false;
-                // The landing push gives part of the take-off loss back, never more than was lost: a hop from a standstill is worth nothing.
-                a.Runner.SpeedCm = Math.Min(a.Runner.MaxSpeed, a.Runner.SpeedCm + Math.Min(Rules.HurdleLandingBoost, _takeoffLoss[p]));
-                _takeoffLoss[p] = 0;
-                a.Pose = Pose.Run;
-            }
+            if (_airTime[p] <= 0) Land(a);
         }
 
         // Crossing the next hurdle?
@@ -136,12 +130,12 @@ public sealed class HurdlesSimulation : RaceSimulation
                 if (_airTime[p] > 0)
                 {
                     double progress = 1 - _airTime[p] / Rules.HurdleAirTime;
-                    if (progress < Rules.HurdleClearMin || progress > Rules.HurdleClearMax)
-                    {
-                        h.Fallen = true;
-                        a.Runner.SpeedCm = Math.Max(0, a.Runner.SpeedCm - Rules.HurdleMinorHitPenalty);
-                        Cue(AudioCue.SfxHurdleHit);
-                    }
+                    if (progress < Rules.HurdleClearMin || progress > Rules.HurdleClearMax) Clip(a, h);
+                }
+                else if (h.X - _landingX[p] <= Rules.HurdleGraceDistance)
+                {
+                    // Jumped a touch early and came down just short of it: the trailing leg knocks it over.
+                    Clip(a, h);
                 }
                 else
                 {
@@ -155,13 +149,50 @@ public sealed class HurdlesSimulation : RaceSimulation
         }
     }
 
+    private void Clip(Athlete a, Hurdle h)
+    {
+        h.Fallen = true;
+        a.Runner.SpeedCm = Math.Max(0, a.Runner.SpeedCm - Rules.HurdleMinorHitPenalty);
+        Cue(AudioCue.SfxHurdleHit);
+    }
+
+    /// <summary>
+    /// Back on the track. The landing push gives <see cref="Rules.HurdleLandingBoost"/> back, but never lifts the runner
+    /// above the take-off speed minus the net cost of a hurdle: a hop from a standstill is worth nothing, and the computer,
+    /// which keeps building speed in the air, only gets what it still lacks.
+    /// </summary>
+    private void Land(Athlete a)
+    {
+        int p = a.PlayerIndex;
+        double ceiling = Math.Max(0, _takeoffSpeed[p] - (Rules.HurdleTakeoffPenalty - Rules.HurdleLandingBoost));
+        double boost = Math.Clamp(ceiling - a.Runner.SpeedCm, 0, Rules.HurdleLandingBoost);
+        a.Runner.SpeedCm = Math.Min(a.Runner.MaxSpeed, a.Runner.SpeedCm + boost);
+        a.Runner.Locked = false;
+        a.Y = 0;
+        _airTime[p] = 0;
+        _takeoffSpeed[p] = 0;
+        _landingX[p] = a.X;
+        a.Pose = Pose.Run;
+    }
+
+    protected override void OnRaceFinished()
+    {
+        // The results phase only lets the runners coast: whoever crossed the line in the air comes down now.
+        foreach (var a in Athletes)
+        {
+            if (_airTime[a.PlayerIndex] > 0) Land(a);
+        }
+        base.OnRaceFinished();
+    }
+
     public override void AddChecksum(ref StateHash h)
     {
         base.AddChecksum(ref h);
         for (int p = 0; p < 2; p++)
         {
             h.Add(_airTime[p]);
-            h.Add(_takeoffLoss[p]);
+            h.Add(_takeoffSpeed[p]);
+            h.Add(_landingX[p]);
             h.Add(_nextHurdle[p]);
             foreach (var hurdle in _hurdles[p]) h.Add(hurdle.Fallen);
         }

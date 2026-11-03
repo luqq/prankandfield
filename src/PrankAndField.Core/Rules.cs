@@ -62,14 +62,15 @@ public static class Rules
     public const double FirstHurdle = 13.72;
     public const double HurdleSpacing = 9.14;
     public const int HurdleCount = 10;
-    // A hurdle is cleared with one press of JUMP. The RUN buttons do nothing while the hurdler is in the air, so the race
-    // is won in the three strides between barriers: there every press is worth more than in the dash, the flight is short
-    // and a clean jump costs the arcade's net 100 cm/s (300 lost at take-off, 200 back on landing). With the test bot a
-    // rhythm of 8 taps/s runs about 13.0 s (the dash takes 12.6 at the same rhythm), 9 taps/s about 11.3 and 10 or more
-    // about 10.5, where the pace sits at the arcade maximum between hurdles; 7 taps/s stays just over the 14.50 standard.
-    public const double HurdleAirTime = 0.45;          // seconds off the ground
-    public const double HurdleClearMin = 0.1;          // fraction of the arc where the barrier may be crossed safely
-    public const double HurdleClearMax = 0.9;
+    // A hurdle is cleared with one press of JUMP. The RUN buttons add nothing while the hurdler is in the air, so the race
+    // is won on the ground between barriers: there every press is worth more than in the dash, the flight is short and a
+    // clean jump costs the arcade's net 100 cm/s (300 lost at take-off, 200 back on landing). With the test bot a clean
+    // heat at 7 taps/s runs about 14.1 s (round 1 asks 14.50), 8 taps/s about 12.7 (the dash takes 12.6 at that rhythm),
+    // 10 taps/s about 10.8, and the pace tops out near 9.6 s, where the dash keeps going down to 8.3.
+    public const double HurdleAirTime = 0.5;           // seconds off the ground (0.6 before: fewer locked ticks, more strides)
+    public const double HurdleClearMin = 0.05;         // fraction of the arc where the barrier may be crossed safely: wider than the
+    public const double HurdleClearMax = 0.95;         // old 0.1-0.9 so the shorter flight keeps about the same clean window
+    public const double HurdleGraceDistance = 1.0;     // landing this close in front of a hurdle clips it (minor hit) instead of running into it
     public const double HurdleTakeoffPenalty = 300;    // cm/s lost when the jump begins (arcade figure)
     public const double HurdleLandingBoost = 200;      // cm/s given back on landing (arcade figure), never more than the take-off took
     public const double HurdleImpulseScale = 1.4;      // a RUN press between hurdles adds 140 cm/s instead of the dash's 100

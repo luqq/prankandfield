@@ -175,7 +175,8 @@ public class HurdlesTests
     }
 
     [Theory]
-    [InlineData(8, 11.8, 14.0)]  // a casual rhythm clears round 1 (14.50) with room for a clipped hurdle
+    [InlineData(7, 13.0, 14.5)]  // a relaxed rhythm meets round 1 (14.50) on a clean run
+    [InlineData(8, 11.8, 13.5)]  // a casual one has room for a clipped hurdle, and meets round 2 (13.50)
     [InlineData(9, 10.6, 12.5)]  // ...and the round-4 standard (12.50)
     [InlineData(11, 9.4, 11.4)]
     public void TappingRhythmDeterminesTheTimeOverTheHurdles(double hz, double min, double max)
@@ -259,21 +260,118 @@ public class HurdlesTests
     }
 
     [Fact]
-    public void KnockedHurdlesChangeTheChecksum()
+    public void HurdleStateIsPartOfTheChecksum()
     {
-        var clean = New();
-        var cleanBot = new Bot(0, 11);
+        var sim = New();
+        var before = new StateHash();
+        sim.AddChecksum(ref before);
+        sim.HurdlesFor(0)[3].Fallen = true; // nothing else changes: only the hurdle state can tell the two apart
+        var after = new StateHash();
+        sim.AddChecksum(ref after);
+        Assert.NotEqual(before.Value, after.Value);
+    }
+
+    /// <summary>
+    /// Alternating taps at 12/s (never on a jump tick) plus one jump per hurdle, taken when the hurdle is
+    /// <paramref name="metresShort"/> further away than the flight covers, so the runner comes down that far before it.
+    /// </summary>
+    private static Func<EventSimulation, (InputFrame, InputFrame)> EarlyJumper(double metresShort, Action<Athlete>? observe = null)
+    {
+        int tick = 0;
+        var jumped = new HashSet<Hurdle>();
+        return s =>
+        {
+            var h = (HurdlesSimulation)s;
+            var a = h.AthleteFor(0)!;
+            observe?.Invoke(a);
+            if (h.Phase != RacePhase.Running || a.Finished) return (InputFrame.None, InputFrame.None);
+            tick++;
+            var next = h.HurdlesFor(0).FirstOrDefault(x => x.X > a.X);
+            if (next is not null && !h.IsAirborne(0) && a.LockTimer <= 0 && !jumped.Contains(next))
+            {
+                double flight = HurdlesSimulation.AirborneSpeed(a.Runner.SpeedCm) / 100.0 * Rules.HurdleAirTime;
+                if (next.X - a.X <= flight + metresShort)
+                {
+                    jumped.Add(next);
+                    return (new InputFrame(Action: true), InputFrame.None);
+                }
+            }
+            if (tick % 5 != 0) return (InputFrame.None, InputFrame.None);
+            return (tick / 5 % 2 == 0 ? new InputFrame(Run1: true) : new InputFrame(Run2: true), InputFrame.None);
+        };
+    }
+
+    [Fact]
+    public void LandingJustShortOfAHurdleClipsItInsteadOfCrashing()
+    {
+        var clip = New();
+        bool stumbled = false;
+        SimulationRunner.RunUntilFinished(clip, EarlyJumper(0.5, a => stumbled |= a.Pose == Pose.Stumble));
+        Assert.Equal(Rules.HurdleCount, clip.FallenCount(0));
+        Assert.False(stumbled);
+        Assert.Contains(AudioCue.SfxHurdleHit, SimulationRunner.DrainCues(clip));
+
         var crash = New();
-        var crashBot = new Bot(0, 11);
-        // tick both until the first hurdles are behind the runner (the gun fires about five seconds in), the crasher never jumping
-        SimulationRunner.RunUntilFinished(clean, s => (cleanBot.NextForSimulation(s), InputFrame.None), maxSeconds: 9);
-        SimulationRunner.RunUntilFinished(crash, s => (crashBot.NextForSimulation(s) with { Action = false }, InputFrame.None), maxSeconds: 9);
-        Assert.Equal(0, clean.FallenCount(0));
-        Assert.True(crash.FallenCount(0) >= 1);
-        var h1 = new StateHash();
-        clean.AddChecksum(ref h1);
-        var h2 = new StateHash();
-        crash.AddChecksum(ref h2);
-        Assert.NotEqual(h1.Value, h2.Value);
+        bool crashed = false;
+        SimulationRunner.RunUntilFinished(crash, EarlyJumper(2.0, a => crashed |= a.Pose == Pose.Stumble));
+        Assert.Equal(Rules.HurdleCount, crash.FallenCount(0));
+        Assert.True(crashed);
+        Assert.True(clip.MarkFor(0) < crash.MarkFor(0) - 2, $"clip {clip.MarkFor(0)} crash {crash.MarkFor(0)}");
+    }
+
+    [Fact]
+    public void CrossingTheLineInTheAirStillLandsForTheResults()
+    {
+        // A slow human who jumps at the line after the computer has finished: the results phase must not keep him airborne.
+        var sim = New();
+        var bot = new Bot(0, 7);
+        bool jumped = false;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var a = sim.AthleteFor(0)!;
+            var f = bot.NextForSimulation(s);
+            if (!jumped && sim.Phase == RacePhase.Running && a.X >= Rules.HurdlesDistance - 1.0 && sim.AthleteFor(1)!.Finished)
+            {
+                jumped = true;
+                f = f with { Action = true };
+            }
+            return (f, InputFrame.None);
+        });
+        Assert.True(jumped);
+        var human = sim.AthleteFor(0)!;
+        Assert.True(human.Finished);
+        Assert.False(sim.IsAirborne(0));
+        Assert.False(human.Runner.Locked);
+        Assert.Equal(0, human.Y);
+        Assert.Null(sim.FlightHeight);
+        Assert.True(human.Runner.SpeedCm < 100, $"still running at {human.Runner.SpeedCm}");
+    }
+
+    [Fact]
+    public void ComputerGetsNoLandingPushOnTopOfWhatItRegainedInTheAir()
+    {
+        // The computer keeps building speed in the air, so by the landing it is already past the take-off ceiling:
+        // the landing tick must not add the 200 cm/s push on top (it used to land 200 above its own pace).
+        var sim = New();
+        double lastAirborne = 0;
+        bool wasAirborne = false;
+        int landings = 0;
+        double worstJump = double.MinValue;
+        SimulationRunner.RunUntilFinished(sim, s =>
+        {
+            var cpu = sim.AthleteFor(1)!;
+            bool airborne = sim.IsAirborne(1);
+            if (!airborne && wasAirborne)
+            {
+                landings++;
+                worstJump = Math.Max(worstJump, cpu.Runner.SpeedCm - lastAirborne);
+            }
+            if (airborne) lastAirborne = cpu.Runner.SpeedCm;
+            wasAirborne = airborne;
+            return (InputFrame.None, InputFrame.None);
+        });
+        Assert.Equal(Rules.HurdleCount, landings);
+        // one tick of the computer's own acceleration is about 15 cm/s; the push would be 200
+        Assert.True(worstJump < 40, $"speed jumped {worstJump} cm/s on landing");
     }
 }
