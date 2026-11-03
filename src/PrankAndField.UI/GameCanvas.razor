@@ -256,7 +256,7 @@
         if (_module is not null) await _module.InvokeVoidAsync("setMuted", _muted);
     }
 
-    /// <summary>Scanline and vignette overlay that mimics the arcade monitor; the choice is remembered by the browser.</summary>
+    /// <summary>Scanline overlay that mimics the arcade monitor; the choice is remembered by the browser.</summary>
     private async Task ToggleCrt()
     {
         if (_module is not null) _crt = await _module.InvokeAsync<bool>("setCrt", !_crt);

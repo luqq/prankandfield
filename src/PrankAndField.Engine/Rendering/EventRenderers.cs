@@ -22,19 +22,6 @@ public static class EventRenderers
         fx.DrawScreen(dl);
     }
 
-    /// <summary>Faint streaks behind a sprinter at full tilt.</summary>
-    private static void DrawSpeedLines(DrawList dl, double ax, double groundY, double speedCm, double time)
-    {
-        if (speedCm < 1000) return;
-        double k = Math.Clamp((speedCm - 1000) / 450.0, 0, 1);
-        for (int i = 0; i < 3; i++)
-        {
-            double y = groundY - 7 - i * 5.5;
-            double len = (6 + i * 2) * k * (0.7 + 0.3 * Math.Sin(time * 25 + i * 2));
-            dl.Line(ax - 7, y, ax - 7 - len, y, 0.8, Palette.White.WithAlpha((byte)(110 * k)));
-        }
-    }
-
     // ------------------------------------------------------------------ races
 
     private static void DrawRace(DrawList dl, Game game, RaceSimulation race, double time, Fx fx)
@@ -65,8 +52,6 @@ public static class EventRenderers
             }
             double ax = Layout.ToScreenX(a.X, camera);
             double heightPx = a.Y * Layout.PxPerMeterY;
-            AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
-            DrawSpeedLines(dl, ax, ground, a.Runner.SpeedCm, time);
             AthleteSprite.Draw(dl, ax, ground - heightPx, a, time);
             fx.Draw(dl, a.PlayerIndex, camera, ground);
             foreach (var c in race.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
@@ -100,7 +85,7 @@ public static class EventRenderers
             if (a.Disqualified) Hud.ShadowText(dl, Screen.Width / 2, top + 2, loc["banner.foul"], Palette.HudRed, 1, TextAlign.Center);
             else
             {
-                dl.FillRect(Screen.Width / 2 - 20, top + 0.5, 40, 10, Palette.HudPanelDark.WithAlpha(170));
+                dl.FillRect(Screen.Width / 2 - 20, top + 0.5, 40, 10, Palette.Black);
                 Hud.DrawTimer(dl, Screen.Width / 2, top + 2, a.FinishTime, a.IsCpu ? Palette.White : Palette.HudYellow, 1, TextAlign.Center);
             }
         }
@@ -120,8 +105,6 @@ public static class EventRenderers
         foreach (var c in lj.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
         double heightPx = a.Y * Layout.PxPerMeterY;
-        AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
-        if (lj.State == JumpState.Approach) DrawSpeedLines(dl, ax, ground, a.Runner.SpeedCm, time);
         AthleteSprite.Draw(dl, ax, ground - heightPx, a, time);
         fx.Draw(dl, 0, camera, ground);
         dl.PopClip();
@@ -145,8 +128,6 @@ public static class EventRenderers
         dl.PushClip(0, Layout.FieldTop, Screen.Width, Layout.FieldBottom - Layout.FieldTop);
         foreach (var c in jv.Critters) Stadium.DrawCritter(dl, c, Layout.ToScreenX(c.X, camera), ground);
         double ax = Layout.ToScreenX(a.X, camera);
-        AthleteSprite.DrawShadow(dl, ax, ground);
-        if (jv.State == ThrowState.Approach) DrawSpeedLines(dl, ax, ground, a.Runner.SpeedCm, time);
         AthleteSprite.Draw(dl, ax, ground, a, time);
         // the javelin: in hand before release, flying after.
         if (jv.State is ThrowState.Approach or ThrowState.WindUp)
@@ -162,7 +143,6 @@ public static class EventRenderers
             // Flight heights are squashed so a normal throw stays on screen; only bird-high throws leave the top.
             double jx = Layout.ToScreenX(jv.JavelinX, camera);
             double jy = ground - jv.JavelinY * Layout.PxPerMeterY * Layout.FlightSquash;
-            if (jv.State == ThrowState.Flight) dl.FillEllipse(jx, ground + 0.5, 4, 1, Palette.Shadow.WithAlpha(40));
             DrawJavelin(dl, jx, jy, -jv.JavelinAngle, 16);
         }
         fx.Draw(dl, 0, camera, ground);
@@ -183,7 +163,6 @@ public static class EventRenderers
         var dir = Vec2.FromAngle(angleDeg);
         var tail = new Vec2(cx, cy) - dir * (length * 0.45);
         var tip = new Vec2(cx, cy) + dir * (length * 0.55);
-        dl.Line(tail, tip, 2.0, Palette.Outline.WithAlpha(120));
         dl.Line(tail, tip, 1.1, Palette.Javelin);
         dl.Line(tip - dir * 3, tip, 1.6, Palette.JavelinTip);
         var grip = new Vec2(cx, cy);
@@ -213,11 +192,8 @@ public static class EventRenderers
             double lift = hm.State == HammerState.Spinning ? Math.Clamp((hm.HammerHeading - HammerSimulation.StartHeading) / 180.0, 0, 1) : 0;
             double ballHeight = 1 + (SpinnerSprite.OrbitHeight(hm.HammerHeading) - 1) * lift;
             var ball = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, ballHeight);
-            var shadow = SpinnerSprite.BallAt(ax, ground, hm.HammerHeading, -0.5);
             bool behind = Math.Sin(hm.HammerHeading * Math.PI / 180.0) < 0;
             var ballColor = hm.State == HammerState.Spinning && hm.InReleaseArc ? Palette.HammerHot : Palette.Hammer;
-            AthleteSprite.DrawShadow(dl, ax, ground);
-            dl.FillEllipse(shadow.X, shadow.Y, 2.6, 1.0, Palette.Shadow.WithAlpha(50));
 
             if (hm.State == HammerState.Fouled)
             {
@@ -237,12 +213,9 @@ public static class EventRenderers
         }
         else
         {
-            AthleteSprite.DrawShadow(dl, ax, ground);
             AthleteSprite.Draw(dl, ax, ground, a, time);
             double hx = Layout.ToScreenX(hm.HammerX, camera);
             double hy = ground - hm.HammerY * Layout.PxPerMeterY * Layout.FlightSquash;
-            if (hm.State == HammerState.Flight) dl.FillEllipse(hx, ground + 0.5, 3, 0.9, Palette.Shadow.WithAlpha(45));
-            dl.FillCircle(hx, hy, 3.2, Palette.Outline.WithAlpha(150));
             dl.FillCircle(hx, hy, 2.6, Palette.Hammer);
             dl.FillCircle(hx - 0.9, hy - 0.9, 0.9, Palette.HammerShine);
             dl.Line(hx, hy, hx - 4, hy - 3, 0.8, Palette.Wire);
@@ -258,7 +231,7 @@ public static class EventRenderers
         DrawFieldBanner(dl, game, hm);
     }
 
-    /// <summary>Red arc on the ground in front of the circle, under the stretch of the orbit where a release is full distance.</summary>
+    /// <summary>Red arc on the ground in front of the circle, under the stretch of the orbit where a release is full distance; it blinks between two reds.</summary>
     private static void DrawReleaseGate(DrawList dl, double ax, double ground, double time)
     {
         const int segments = 10;
@@ -268,17 +241,14 @@ public static class EventRenderers
             double deg = -Rules.HammerReleaseArc + i * 2 * Rules.HammerReleaseArc / segments;
             pts[i] = SpinnerSprite.BallAt(ax, ground, deg, -0.5);
         }
-        byte alpha = (byte)(150 + 60 * Math.Sin(time * 6));
-        dl.Polyline(1.2, Palette.HammerHot.WithAlpha(alpha), pts);
+        dl.Polyline(1.2, Math.Sin(time * 6) > 0 ? Palette.HammerHot : Palette.HammerHot.Darker(0.7), pts);
     }
 
     private static void DrawHammerBall(DrawList dl, double handX, double handY, double hx, double hy, Rgba color)
     {
         dl.Line(handX, handY, hx, hy, 0.8, Palette.Wire);
-        if (color != Palette.Hammer) dl.Glow(hx, hy, 7, color.WithAlpha(120));
-        dl.FillCircle(hx, hy, 3.4, Palette.Outline.WithAlpha(150));
         dl.FillCircle(hx, hy, 2.8, color);
-        dl.FillCircle(hx - 1, hy - 1, 0.9, color.Lighter(0.5));
+        dl.FillCircle(hx - 1, hy - 1, 0.9, color == Palette.Hammer ? Palette.HammerShine : Palette.White);
     }
 
     // ------------------------------------------------------------------ high jump
@@ -304,7 +274,6 @@ public static class EventRenderers
         }
         double heightPx = a.Y * Layout.PxPerMeterY;
         double ay = ground - heightPx - matLift;
-        if (!hj.OnMat) AthleteSprite.DrawShadow(dl, ax, ground, heightPx);
         if (hj.State == HighJumpState.Airborne)
         {
             // Fosbury flop: after the take-off stretch the jumper turns his back to the bar (mirrored sprite)
@@ -339,8 +308,7 @@ public static class EventRenderers
         {
             double y = Layout.FieldTop + 10;
             double w = 74, h = 15;
-            dl.FillRect(Screen.Width / 2 - w / 2 - 2, y - 2, w + 4, h + 4, Palette.HudYellow.WithAlpha(40));
-            dl.FillGradientRect(Screen.Width / 2 - w / 2, y, w, h, Palette.HudPanel.WithAlpha(230), Palette.HudPanelDark.WithAlpha(230));
+            dl.FillRect(Screen.Width / 2 - w / 2, y, w, h, Palette.Black);
             dl.FillRect(Screen.Width / 2 - w / 2, y, w, 0.8, Palette.HudYellow);
             dl.FillRect(Screen.Width / 2 - w / 2, y + h - 0.8, w, 0.8, Palette.HudYellow);
             Hud.DrawMark(dl, Screen.Width / 2, y + 3.5, sim.Kind, sim.BannerValue, loc, Palette.HudYellow, Palette.HudGreen, 1.2, TextAlign.Center);

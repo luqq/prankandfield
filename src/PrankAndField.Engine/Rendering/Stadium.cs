@@ -4,7 +4,11 @@ using PrankAndField.Engine.Graphics;
 
 namespace PrankAndField.Engine.Rendering;
 
-/// <summary>Draws the stadium furniture: floodlit grandstand, wall with boards and flags, lanes and sectors.</summary>
+/// <summary>
+/// Draws the stadium furniture: the grandstand under its roof, the wall with advertising boards, the
+/// electronic board and the flags, lanes and sectors. Everything is flat colour with hard edges, like the
+/// 1983 arcade: no gradients, no glows, no translucent shadows.
+/// </summary>
 public static class Stadium
 {
     private static readonly string[] AdTexts = ["HIRYU SOFT", "PRANK & FIELD", "VECTOR CUP", "1983"];
@@ -29,17 +33,29 @@ public static class Stadium
         return r < 0 ? r + m : r;
     }
 
-    /// <summary>Grandstand: a floodlit roof over terraces full of spectators with flags and camera flashes, scrolling at half speed.</summary>
+    /// <summary>Points of a circular arc (screen angles in degrees, 0 = right, 90 = down) for a polyline.</summary>
+    internal static Vec2[] ArcPoints(double cx, double cy, double r, double startDeg, double endDeg, int segments = 12)
+    {
+        var pts = new Vec2[segments + 1];
+        for (int i = 0; i <= segments; i++)
+        {
+            double a = (startDeg + (endDeg - startDeg) * i / segments) * Math.PI / 180.0;
+            pts[i] = new Vec2(cx + Math.Cos(a) * r, cy + Math.Sin(a) * r);
+        }
+        return pts;
+    }
+
+    /// <summary>Grandstand: a roof with banks of floodlights over terraces full of spectators with flags and camera flashes, scrolling at half speed.</summary>
     public static void DrawStands(DrawList dl, double scrollPx, double time)
     {
         double top = Layout.StandsTop, bottom = Layout.StandsBottom;
         const double roofH = 5;
         // roof underside with banks of floodlights (far away: quarter speed)
-        dl.FillGradientRect(0, top, Screen.Width, roofH, Palette.RoofDark, Palette.Roof);
+        dl.FillRect(0, top, Screen.Width, roofH, Palette.RoofDark);
+        dl.FillRect(0, top + roofH - 1, Screen.Width, 1, Palette.Roof);
         double lampOff = Mod(scrollPx * 0.25, 48);
         for (double x = -lampOff - 48; x < Screen.Width + 48; x += 48)
         {
-            dl.Glow(x + 6, top + 4.5, 7, Palette.FloodGlow.WithAlpha(120));
             dl.FillRect(x + 1.5, top + 1.4, 9, 0.8, Palette.Grey);
             for (int k = 0; k < 3; k++) dl.FillRect(x + 2 + k * 3, top + 2.4, 2, 1.6, Palette.Floodlight);
         }
@@ -47,7 +63,6 @@ public static class Stadium
         double terraceTop = top + roofH;
         const int rows = 4;
         double rowH = (bottom - 2 - terraceTop) / rows;
-        dl.FillGradientRect(0, terraceTop, Screen.Width, bottom - terraceTop, Palette.TerraceBack, Palette.StandRow);
         double offset = Mod(scrollPx * 0.5, 4.0);
         int baseCol = (int)Math.Floor(scrollPx * 0.5 / 4.0);
         for (int r = 0; r < rows; r++)
@@ -80,13 +95,13 @@ public static class Stadium
                     dl.FillRect(x + 2.2, y - 1.4, 0.4, 2.8, Palette.LightGrey);
                     dl.FillPolygon(flag, new Vec2(x + 2.6, y - 1.4), new Vec2(x + 5.0, y - 0.6 + wave), new Vec2(x + 2.6, y + 0.4));
                 }
-                // camera flashes: a handful of photographers, each firing for a tenth of a second now and then
+                // camera flashes: a handful of photographers, each firing a white pixel for a tenth of a second now and then
                 if ((hsh >> 20) % 23 == 0 && Mod(time * 0.9 + hsh % 17, 7) < 0.1)
                 {
-                    dl.Glow(x + 1.1, y + 0.6, 3.5, Palette.Flash.WithAlpha(240));
+                    dl.FillRect(x + 0.1, y - 0.4, 2, 2, Palette.Flash);
                 }
             }
-            dl.FillRect(0, y + rowH - 0.6, Screen.Width, 0.6, Palette.Rail.WithAlpha(160));
+            dl.FillRect(0, y + rowH - 0.6, Screen.Width, 0.6, Palette.Rail);
         }
         // front barrier
         dl.FillRect(0, bottom - 2, Screen.Width, 2, Palette.WallDark);
@@ -100,7 +115,7 @@ public static class Stadium
     public static void DrawWall(DrawList dl, string eventName, int round, double scrollPx = 0, double time = 0)
     {
         double top = Layout.WallTop, h = Layout.WallBottom - Layout.WallTop;
-        dl.FillGradientRect(0, top, Screen.Width, h, Palette.WallLight, Palette.Wall);
+        dl.FillRect(0, top, Screen.Width, h, Palette.Wall);
         dl.FillRect(0, top, Screen.Width, 1.2, Palette.WallDark);
         dl.FillRect(0, top + h - 1.5, Screen.Width, 1.5, Palette.WallDark);
         // the electronic board with the event name: capped so it never reaches the flags, shrinking the text to fit
@@ -123,7 +138,6 @@ public static class Stadium
             int idx = ((i % AdTexts.Length) + AdTexts.Length) % AdTexts.Length;
             var (back, fore) = AdColors[idx];
             dl.FillRect(x + 2, top + 3, panelW - 4, 8, back);
-            dl.FillRect(x + 2, top + 3, panelW - 4, 0.6, back.Lighter(0.4));
             double adW = PixelFont.Measure(AdTexts[idx], 0.7);
             double adL = x + panelW / 2 - adW / 2, adR = adL + adW;
             if (!Covered(adL, adR))
@@ -131,9 +145,7 @@ public static class Stadium
         }
         dl.FillRect(bx - 1, top + 1, boardW + 2, h - 2, Palette.WallDark);
         dl.FillRect(bx, top + 2, boardW, h - 4, Palette.Scoreboard);
-        dl.FillRect(bx + 1, top + 3, boardW - 2, 0.5, Palette.HudFrame.WithAlpha(150));
         double ty = top + (h - PixelFont.GlyphH * textSize) / 2;
-        PixelFont.Draw(dl, Screen.Width / 2 + 0.6, ty + 0.6, eventName, Palette.ScoreboardText.Darker(0.45), textSize, TextAlign.Center);
         PixelFont.Draw(dl, Screen.Width / 2, ty, eventName, Palette.ScoreboardText, textSize, TextAlign.Center);
         DrawFlag(dl, 8, top + 2.5, round, time);
         DrawFlag(dl, Screen.Width - 22, top + 2.5, round + 1, time + 1.3);
@@ -183,6 +195,16 @@ public static class Stadium
         for (double x = first; x < Screen.Width; x += 2 * period) dl.FillRect(x, top, period, h, Palette.GrassStripe);
     }
 
+    /// <summary>Flat terracotta runway between two white lines, with a dark kerb along the grass above it.</summary>
+    private static void DrawRunway(DrawList dl, double top, double w, double h)
+    {
+        if (w <= 0) return;
+        dl.FillRect(0, top - 0.8, w, 0.8, Palette.GrassDark);
+        dl.FillRect(0, top, w, h, Palette.Track);
+        dl.FillRect(0, top, w, 1, Palette.LaneLine);
+        dl.FillRect(0, top + h - 1, w, 1, Palette.LaneLine);
+    }
+
     /// <summary>A running lane strip: grass, terracotta track with white lines and distance ticks, blocks, start and finish.</summary>
     public static void DrawLaneStrip(DrawList dl, double top, double cameraX, int laneNumber, double finishM, string laneLabel, Rgba labelColor)
     {
@@ -190,11 +212,7 @@ public static class Stadium
         dl.PushClip(0, top, Screen.Width, h);
         DrawGrass(dl, top, h, cameraX);
         double trackTop = top + 8, trackH = 28;
-        dl.FillGradientRect(0, trackTop, Screen.Width, trackH, Palette.TrackDark, Palette.Track);
-        dl.FillGradientRect(0, trackTop + trackH - 7, Screen.Width, 7, Palette.Track, Palette.TrackLight);
-        dl.FillRect(0, trackTop - 0.8, Screen.Width, 0.8, Palette.GrassDark);
-        dl.FillRect(0, trackTop, Screen.Width, 1, Palette.LaneLine);
-        dl.FillRect(0, trackTop + trackH - 1, Screen.Width, 1, Palette.LaneLine);
+        DrawRunway(dl, trackTop, Screen.Width, trackH);
         dl.FillRect(0, trackTop + trackH / 2 - 0.4, Screen.Width, 0.8, Palette.TrackDark);
 
         // distance ticks every 10 m
@@ -216,10 +234,8 @@ public static class Stadium
             dl.FillRect(startX - 7, trackTop + trackH - 2.6, 6, 1, Palette.DarkGrey);
             dl.FillPolygon(Palette.HudRed.Darker(0.8), new Vec2(startX - 6.5, trackTop + trackH - 2.6), new Vec2(startX - 4.5, trackTop + trackH - 2.6), new Vec2(startX - 4.5, trackTop + trackH - 4.6));
             dl.FillPolygon(Palette.HudRed.Darker(0.8), new Vec2(startX - 3.5, trackTop + trackH - 2.6), new Vec2(startX - 1.5, trackTop + trackH - 2.6), new Vec2(startX - 1.5, trackTop + trackH - 4.2));
-            dl.FillRect(startX - 17, trackTop + trackH / 2 - 6, 12, 12, Palette.Outline.WithAlpha(120));
             dl.FillRect(startX - 16, trackTop + trackH / 2 - 5, 10, 10, Palette.White);
             PixelFont.Draw(dl, startX - 11, trackTop + trackH / 2 - 3.5, laneNumber.ToString(), Palette.Black, 1, TextAlign.Center);
-            PixelFont.Draw(dl, startX + 14.6, trackTop + 3.1, laneLabel, Palette.Outline.WithAlpha(160), 1);
             PixelFont.Draw(dl, startX + 14, trackTop + 2.5, laneLabel, labelColor, 1);
         }
         // finish line (chequered band) with the photo-finish camera on its post
@@ -252,15 +268,11 @@ public static class Stadium
         var tr = Rot(new Vec2(sx + 1.5, groundY - h));
         var bl = baseL;
         var br = Rot(new Vec2(sx + 1.5, groundY));
-        dl.FillEllipse(sx + 1, groundY + 0.6, 4.5, 1.1, Palette.Shadow);
-        dl.Line(bl, tl, 1.9, Palette.Outline.WithAlpha(170));
-        dl.Line(br, tr, 1.9, Palette.Outline.WithAlpha(170));
         dl.Line(bl, tl, 1, Palette.Hurdle);
         dl.Line(br, tr, 1, Palette.Hurdle);
         dl.Line(Rot(new Vec2(sx - 1.5, groundY - h * 0.45)), Rot(new Vec2(sx + 1.5, groundY - h * 0.45)), 0.8, Palette.Hurdle);
         var barL = Rot(new Vec2(sx - 2.4, groundY - h));
         var barR = Rot(new Vec2(sx + 2.4, groundY - h));
-        dl.Line(barL, barR, 3.2, Palette.Outline.WithAlpha(170));
         dl.Line(barL, barR, 2.4, Palette.HurdleBar);
         dl.Line(Rot(new Vec2(sx - 2.4, groundY - h + 0.7)), Rot(new Vec2(sx + 2.4, groundY - h + 0.7)), 0.9, Palette.HurdleStripe);
         dl.FillRect(sx - 3.5, groundY - 0.5, 7, 1, Palette.Hurdle);
@@ -275,11 +287,7 @@ public static class Stadium
         double runTop = top + 30, runH = 30;
         double boardX = Layout.ToScreenX(boardM, cameraX);
         // runway up to the board
-        double runW = Math.Max(0, boardX + 2);
-        dl.FillGradientRect(0, runTop, runW, runH, Palette.TrackDark, Palette.Track);
-        dl.FillGradientRect(0, runTop + runH - 7, runW, 7, Palette.Track, Palette.TrackLight);
-        dl.FillRect(0, runTop, runW, 1, Palette.LaneLine);
-        dl.FillRect(0, runTop + runH - 1, runW, 1, Palette.LaneLine);
+        DrawRunway(dl, runTop, Math.Max(0, boardX + 2), runH);
         // ticks every 5 m on the runway
         for (double m = Math.Floor(cameraX / 5) * 5; m <= boardM; m += 5)
         {
@@ -303,7 +311,7 @@ public static class Stadium
             new Vec2(pitL + 1.5, runTop - 2.5), new Vec2(pitR - 1.5, runTop - 2.5), new Vec2(pitR + 4, runTop + runH + 2.5), new Vec2(pitL - 4, runTop + runH + 2.5),
         };
         dl.FillPolygon(Palette.Sand, sand);
-        // raked sand: light grains and faint rake lines fixed to the pit
+        // raked sand: light and dark grains plus the rake lines, fixed to the pit
         if (pitR > 0 && pitL < Screen.Width)
         {
             for (int i = 0; i < 48; i++)
@@ -316,11 +324,10 @@ public static class Stadium
             for (int k = 1; k < 5; k++)
             {
                 double ly = runTop + k * runH / 5;
-                dl.Line(pitL + 1, ly, pitR - 1, ly, 0.4, Palette.SandEdge.WithAlpha(90));
+                dl.FillRect(pitL + 1, ly, pitR - pitL - 2, 0.4, Palette.SandEdge);
             }
         }
         // metre markers board (white strip above the pit with numbers)
-        dl.FillRect(pitL, runTop - 10.6, pitR - pitL, 5.6, Palette.Outline.WithAlpha(90));
         dl.FillRect(pitL, runTop - 10, pitR - pitL, 5, Palette.White);
         for (int m = 2; m <= 11; m++)
         {
@@ -330,10 +337,11 @@ public static class Stadium
         }
         if (landingMark > 0)
         {
+            // the two footprints and the red measuring line where the jumper landed
             double sx = Layout.ToScreenX(boardM + landingMark, cameraX);
             dl.FillEllipse(sx - 1.5, runTop + runH * 0.55, 2.2, 1.2, Palette.SandEdge.Darker(0.8));
             dl.FillEllipse(sx + 1.0, runTop + runH * 0.62, 2.2, 1.2, Palette.SandEdge.Darker(0.8));
-            dl.FillRect(sx - 0.6, runTop + 4, 1.2, runH - 8, Palette.HudRed.WithAlpha(170));
+            dl.FillRect(sx - 0.6, runTop + 4, 1.2, runH - 8, Palette.HudRed);
         }
         dl.PopClip();
     }
@@ -346,8 +354,8 @@ public static class Stadium
             double sx = Layout.ToScreenX(originM + m, cameraX);
             if (sx < -10 || sx > Screen.Width + 10) continue;
             double r = sx - originX;
-            if (r > 2) dl.Arc(originX, originY, r, -24, 24, 0.8, Palette.White.WithAlpha(150));
-            else dl.FillRect(sx, top + 6, 0.8, h - 12, Palette.White.WithAlpha(150));
+            if (r > 2) dl.Polyline(0.8, Palette.White, ArcPoints(originX, originY, r, -24, 24));
+            else dl.FillRect(sx, top + 6, 0.8, h - 12, Palette.White);
             PixelFont.Draw(dl, sx + 2, top + 8, m.ToString(), Palette.White, 0.75);
         }
     }
@@ -360,18 +368,14 @@ public static class Stadium
         DrawGrass(dl, top, h, cameraX);
         double runTop = top + 34, runH = 26;
         double lineX = Layout.ToScreenX(lineM, cameraX);
-        double runW = Math.Max(0, lineX);
-        dl.FillGradientRect(0, runTop, runW, runH, Palette.TrackDark, Palette.Track);
-        dl.FillGradientRect(0, runTop + runH - 6, runW, 6, Palette.Track, Palette.TrackLight);
-        dl.FillRect(0, runTop, runW, 1, Palette.LaneLine);
-        dl.FillRect(0, runTop + runH - 1, runW, 1, Palette.LaneLine);
+        DrawRunway(dl, runTop, Math.Max(0, lineX), runH);
         // foul arc at the end of the runway
         double cy = runTop + runH / 2;
-        dl.Arc(lineX - 52, cy, 58, -16, 16, 1.6, Palette.White);
+        dl.Polyline(1.6, Palette.White, ArcPoints(lineX - 52, cy, 58, -16, 16, 10));
         // sector lines
         double sectorStart = lineX + 4;
-        dl.Line(sectorStart, cy, Screen.Width + 20, top - 10, 0.8, Palette.White.WithAlpha(190));
-        dl.Line(sectorStart, cy, Screen.Width + 20, top + h + 10, 0.8, Palette.White.WithAlpha(190));
+        dl.Line(sectorStart, cy, Screen.Width + 20, top - 10, 0.8, Palette.White);
+        dl.Line(sectorStart, cy, Screen.Width + 20, top + h + 10, 0.8, Palette.White);
         DrawSectorArcs(dl, lineX, cy, lineM, cameraX, top, h);
         dl.PopClip();
     }
@@ -384,47 +388,35 @@ public static class Stadium
         DrawGrass(dl, top, h, cameraX);
         double cx = Layout.ToScreenX(0, cameraX);
         double cy = top + 60;
-        // throwing circle: concrete with a rim and a highlight
-        dl.FillEllipse(cx, cy + 1, 16.5, 9.5, Palette.Outline.WithAlpha(90));
+        // throwing circle: concrete with a rim
         dl.FillEllipse(cx, cy, 16, 9, Palette.LightGrey);
         dl.FillEllipse(cx, cy, 14.5, 7.8, Palette.Grey);
-        dl.FillEllipse(cx - 1, cy - 1, 11, 5.5, Palette.Grey.Lighter(0.12));
-        dl.FillRect(cx - 14, cy - 0.3, 28, 0.6, Palette.DarkGrey.WithAlpha(120));
-        // cage: posts, net and the top ring
+        dl.FillRect(cx - 14, cy - 0.3, 28, 0.6, Palette.DarkGrey);
+        // cage: posts, three rails and the top ring
         var cage = new List<Vec2>();
         for (int i = 0; i <= 10; i++)
         {
             double a = Math.PI * 0.55 + i / 10.0 * Math.PI * 0.9;
             cage.Add(new Vec2(cx + Math.Cos(a) * 24, cy + Math.Sin(a) * 15));
         }
-        var net = Palette.Cage.WithAlpha(110);
-        for (int i = 0; i < 10; i++)
-        {
-            // diagonal mesh between posts
-            var p = cage[i];
-            var q = cage[i + 1];
-            dl.Line(p.X, p.Y - 14, q.X, q.Y, 0.4, net);
-            dl.Line(p.X, p.Y, q.X, q.Y - 14, 0.4, net);
-        }
         for (int k = 1; k < 4; k++)
         {
             var row = new Vec2[cage.Count];
             for (int i = 0; i < cage.Count; i++) row[i] = new Vec2(cage[i].X, cage[i].Y - k * 3.5);
-            dl.Polyline(0.4, net, row);
+            dl.Polyline(0.4, Palette.Cage, row);
         }
         dl.Polyline(1.2, Palette.Cage, cage.ToArray());
         for (int i = 0; i <= 10; i += 2)
         {
             var p = cage[i];
-            dl.Line(p.X, p.Y + 0.5, p.X, p.Y - 14, 1.4, Palette.Outline.WithAlpha(120));
             dl.Line(p.X, p.Y, p.X, p.Y - 14, 1, Palette.Cage);
         }
         var topRing = new Vec2[cage.Count];
         for (int i = 0; i < cage.Count; i++) topRing[i] = new Vec2(cage[i].X, cage[i].Y - 14);
         dl.Polyline(1, Palette.Cage, topRing);
         // sector
-        dl.Line(cx + 14, cy, Screen.Width + 400, top - 40, 0.8, Palette.White.WithAlpha(190));
-        dl.Line(cx + 14, cy, Screen.Width + 400, top + h + 40, 0.8, Palette.White.WithAlpha(190));
+        dl.Line(cx + 14, cy, Screen.Width + 400, top - 40, 0.8, Palette.White);
+        dl.Line(cx + 14, cy, Screen.Width + 400, top + h + 40, 0.8, Palette.White);
         DrawSectorArcs(dl, cx, cy, 0, cameraX, top, h);
         dl.PopClip();
     }
@@ -446,7 +438,7 @@ public static class Stadium
 
         // apron (approach lane) up to the uprights
         double apronW = Math.Max(0, barX - 1);
-        dl.FillGradientRect(0, groundY + apronTop, apronW, apronH, Palette.TrackDark, Palette.TrackLight);
+        dl.FillRect(0, groundY + apronTop, apronW, apronH, Palette.Track);
         dl.FillRect(0, groundY + apronTop, apronW, 0.8, Palette.LaneLine);
         dl.FillRect(0, groundY + apronTop + apronH - 0.8, apronW, 0.8, Palette.LaneLine);
         for (double m = Math.Floor(cameraX / 2) * 2; m < 0; m += 2)
@@ -465,8 +457,7 @@ public static class Stadium
         dl.FillRect(zoneR - 0.8, groundY + apronTop + 0.8, 0.8, apronH - 1.6, Palette.LaneLine);
         dl.FillRect(bestX - 0.7, groundY + apronTop + 0.8, 1.4, apronH - 1.6, Palette.White);
 
-        // mat: a padded box seen from the side with its top, front and end faces
-        dl.FillEllipse(barX + 24, groundY + 9, 30, 2.5, Palette.Shadow);
+        // mat: a padded box seen from the side, the top face lighter than the front, with the cushion seams
         var matFront = new[]
         {
             new Vec2(barX - 3, groundY - 4), new Vec2(barX + 48, groundY - 4),
@@ -479,8 +470,6 @@ public static class Stadium
             new Vec2(barX + 48, groundY - 4), new Vec2(barX - 3, groundY - 4),
         };
         dl.FillPolygon(Palette.Mat, matTop);
-        dl.FillPolygon(Palette.MatLight, [new Vec2(barX + 1, groundY - 14), new Vec2(barX + 46, groundY - 14), new Vec2(barX + 46.5, groundY - 11.5), new Vec2(barX + 0.5, groundY - 11.5)]);
-        // cushion seams
         for (int k = 1; k < 4; k++)
         {
             double sx = barX - 3 + k * 12.5;
@@ -492,8 +481,7 @@ public static class Stadium
         double barPx = barHeightM * Layout.PxPerMeterY;
         double postTop = groundY - barPx - 12;
         dl.FillRect(barX - 3, groundY - 1, 5.6, 1.4, Palette.UprightBase);
-        dl.FillRect(barX - 1.4, postTop, 2.4, groundY - postTop, Palette.Outline.WithAlpha(120));
-        dl.FillGradientRect(barX - 1, postTop, 1.6, groundY - postTop, Palette.LightGrey, Palette.Upright, horizontal: true);
+        dl.FillRect(barX - 1.2, postTop, 2, groundY - postTop, Palette.Upright);
         dl.FillRect(barX + 44.4, postTop + 2, 1.6, groundY - 14 - (postTop + 2), Palette.Upright.Darker(0.8));
         // height ticks on the near upright every 10 cm around the bar
         for (int i = -2; i <= 2; i++)
@@ -506,7 +494,6 @@ public static class Stadium
         double barY = groundY - barPx;
         if (barFallAnim <= 0)
         {
-            dl.FillRect(barX - 1, barY - 1, 44, 2, Palette.Outline.WithAlpha(110));
             dl.FillRect(barX - 1, barY - 0.7, 44, 1.4, Palette.Bar);
             dl.FillRect(barX + 9, barY - 0.7, 6, 1.4, Palette.FlagRed);
             dl.FillRect(barX + 27, barY - 0.7, 6, 1.4, Palette.FlagRed);
@@ -520,7 +507,6 @@ public static class Stadium
             double matNear = groundY - 11, matFar = groundY - 13;
             var a = new Vec2(barX + 3 + nearDrop * 4, barY + (matNear - barY) * nearDrop * nearDrop);
             var b = new Vec2(barX + 41 - g * 2, barY + (matFar - barY) * g);
-            dl.Line(a, b, 2.2, Palette.Outline.WithAlpha(110));
             dl.Line(a, b, 1.4, Palette.Bar);
             var mid = (a + b) * 0.5;
             dl.FillCircle(mid.X, mid.Y, 1.1, Palette.FlagRed);
@@ -540,9 +526,7 @@ public static class Stadium
             double pop = Math.Min(1, c.Age * 3) * (c.Age > c.Lifetime - 0.5 ? (c.Lifetime - c.Age) * 2 : 1);
             double hy = groundY - 7 * Math.Clamp(pop, 0, 1);
             dl.FillEllipse(sx, groundY - 0.3, 5.5, 1.6, Palette.TrackDark);
-            dl.FillEllipse(sx, hy + 3.2, 4.4, 4.6, Palette.Outline.WithAlpha(140));
             dl.FillEllipse(sx, hy + 3, 4, 4.2, Palette.Mole);
-            dl.FillEllipse(sx + 0.6, hy + 3.6, 2.4, 2.4, Palette.Mole.Lighter(0.2));
             dl.FillCircle(sx + 3.2, hy + 1.6, 1.2, Palette.MoleNose);
             dl.FillRect(sx + 0.5, hy + 0.6, 1, 1, Palette.Black);
             dl.FillRect(sx - 3, groundY - 2, 6, 2, Palette.Mole.Darker(0.8));
@@ -554,8 +538,6 @@ public static class Stadium
             double fall = Math.Max(0, c.Age - 0.4) * 30;
             double by = groundY - c.Y * Layout.PxPerMeterY * (c.Y > 8 ? Layout.FlightSquash : 1) + fall;
             double bx = sx + c.Age * 14;
-            dl.Line(bx - 5, by - flap, bx, by + 1, 2.2, Palette.Outline.WithAlpha(120));
-            dl.Line(bx, by + 1, bx + 5, by - flap, 2.2, Palette.Outline.WithAlpha(120));
             dl.Line(bx - 5, by - flap, bx, by + 1, 1.2, Palette.Bird);
             dl.Line(bx, by + 1, bx + 5, by - flap, 1.2, Palette.Bird);
             dl.FillCircle(bx, by + 1, 1.3, Palette.Bird);

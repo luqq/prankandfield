@@ -6,8 +6,9 @@ namespace PrankAndField.Engine.Rendering;
 
 /// <summary>
 /// Visual-only particles: dust behind sprinting feet, sand spray on landing, dirt where an implement hits
-/// the ground, fireworks for a qualified mark. The simulation never sees them, so they cannot affect the
-/// lockstep checksum; they only live in the renderer and advance with the game clock.
+/// the ground, fireworks for a qualified mark. Every particle is a flat opaque pixel that shrinks and dies,
+/// never a translucent one. The simulation never sees them, so they cannot affect the lockstep checksum;
+/// they only live in the renderer and advance with the game clock.
 /// </summary>
 public sealed class Fx
 {
@@ -82,7 +83,7 @@ public sealed class Fx
             {
                 Lane = lane, X = worldX + Range(-0.15, 0.05), Y = Range(0, 1.5),
                 Vx = Range(-1.2, -0.2), Vy = Range(6, 16), Life = life, MaxLife = life,
-                Size = Range(0.9, 1.7), Gravity = 12, Color = c.WithAlpha(170),
+                Size = Range(0.9, 1.7), Gravity = 12, Color = c,
             });
         }
     }
@@ -128,9 +129,8 @@ public sealed class Fx
             double sx = Layout.ToScreenX(p.X, cameraX);
             if (sx < -4 || sx > Screen.Width + 4) continue;
             double t = p.Life / p.MaxLife;
-            byte alpha = (byte)(p.Color.A * Math.Clamp(t * 1.4, 0, 1));
-            double s = p.Size * (0.6 + 0.6 * t);
-            dl.FillRect(sx - s / 2, groundY - p.Y - s / 2, s, s, p.Color.WithAlpha(alpha));
+            double s = p.Size * (0.4 + 0.8 * t);
+            dl.FillRect(sx - s / 2, groundY - p.Y - s / 2, s, s, p.Color);
         }
     }
 
@@ -141,11 +141,8 @@ public sealed class Fx
         {
             if (p.Lane != ScreenSpace) continue;
             double t = p.Life / p.MaxLife;
-            byte alpha = (byte)(p.Color.A * Math.Clamp(t * 1.5, 0, 1));
-            double s = p.Size * (0.5 + 0.8 * t);
-            dl.FillRect(p.X - s / 2, p.Y - s / 2, s, s, p.Color.WithAlpha(alpha));
-            // a short tail against the direction of travel
-            if (t > 0.5) dl.Line(p.X, p.Y, p.X - p.Vx * 0.04, p.Y - p.Vy * 0.04, s * 0.6, p.Color.WithAlpha((byte)(alpha / 2)));
+            double s = p.Size * (0.4 + 0.9 * t);
+            dl.FillRect(p.X - s / 2, p.Y - s / 2, s, s, p.Color);
         }
     }
 }
@@ -254,7 +251,7 @@ public sealed class FxDirector
                 if (Changed((int)hj.State))
                 {
                     if (hj.State == HighJumpState.Rising) fx.Dust(0, hj.CurrentAthlete.X, 5);
-                    if (hj.State is HighJumpState.Landed or HighJumpState.Missed) fx.Splash(0, Math.Max(0.4, hj.CurrentAthlete.X), 10, Palette.MatLight.Lighter(0.4), 0.6);
+                    if (hj.State is HighJumpState.Landed or HighJumpState.Missed) fx.Splash(0, Math.Max(0.4, hj.CurrentAthlete.X), 10, Palette.MatSpray, 0.6);
                 }
                 break;
         }
