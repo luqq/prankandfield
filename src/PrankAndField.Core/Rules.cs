@@ -101,20 +101,36 @@ public static class Rules
     // The thrower runs up, presses THROW before the line to plant his feet and keeps it held: a dial climbs
     // from 20 to 70 degrees and the javelin leaves his hand when the button is released, or by itself when
     // the dial tops out. The mark is measured from the foul line and nothing in flight changes it.
+    // Hardened on 3/11 (the first cut was too easy): the run-up weighs more, the dial is faster and only a
+    // release close to 45 gets the whole throw. With the test bot (it plants 0.6 m before the line, just after a
+    // tap) letting go at 46: 6 taps/s ~50 m (out), 7 ~64 m (round 1), 8 ~72 m (round 2), 9 ~81 m (round 3),
+    // 10 ~89 m (round 4), 11 ~98 m, 13 ~109 m. A run-up planted between taps or a metre early loses up to ~9 m,
+    // so a steady 7.5-8 taps/s is what clears round 1 every time.
     public const double JavelinLine = 30.0;
-    public const double JavelinArmSpeed = 11.0;        // m/s added by the arm
-    public const double JavelinRunFactor = 0.75;
-    public const double JavelinRangeFactor = 2.5;      // arcade scale on the ballistic range: 7 taps/s at 45 degrees throws ~73 m, 6 taps/s ~61 m, 9 taps/s ~86 m
+    public const double JavelinArmSpeed = 8.5;         // m/s added by the arm (was 11: a jog could clear round 1)
+    public const double JavelinRunFactor = 1.0;        // every m/s of run-up is a m/s of launch (was 0.75)
+    public const double JavelinRangeFactor = 2.35;     // arcade scale on the ballistic range
     public const double JavelinBirdApex = 20.0;        // metres: higher than this hits the bird
     public const double JavelinAngleStart = 20;        // the dial starts here when the thrower plants: nobody throws flat
     public const double JavelinAngleMax = 70;          // ...and throws by itself when it gets here, so nobody parks at a bad angle
-    public const double JavelinAngleRate = 60;         // degrees per second while holding: 45 comes 0.42 s after the plant, 70 at 0.83 s
-    public const double JavelinBestAngle = 45;         // longest throw (the range curve is symmetric around it: 20 and 70 throw the same)
+    public const double JavelinAngleRate = 75;         // degrees per second while holding (1.25 a frame, so the dial passes through 45 exactly): 45 comes 1/3 s after the plant, 70 at 2/3 s
+    public const double JavelinBestAngle = 45;         // longest throw (the curve is symmetric around it: 20 and 70 throw the same)
+    public const double JavelinAngleTolerance = 35;    // degrees off the best angle at which the technique would be worth nothing
 
     public static double JavelinLaunchSpeed(double runSpeedMps) => runSpeedMps * JavelinRunFactor + JavelinArmSpeed;
 
+    /// <summary>
+    /// Share of the ballistic range a release at this angle keeps: 1 at 45, 0.98 five degrees off, 0.92 ten off,
+    /// 0.49 at either end of the dial. Multiplied by sin(2a) of the range itself the ends throw about a third of the best.
+    /// </summary>
+    public static double JavelinAngleEfficiency(double angleDeg)
+    {
+        double d = (angleDeg - JavelinBestAngle) / JavelinAngleTolerance;
+        return Math.Max(0.05, 1 - d * d);
+    }
+
     public static double JavelinDistance(double launchSpeedMps, double angleDeg) =>
-        Math.Max(1.0, JavelinRangeFactor * Ballistics.Range(launchSpeedMps, angleDeg));
+        Math.Max(1.0, JavelinRangeFactor * Ballistics.Range(launchSpeedMps, angleDeg) * JavelinAngleEfficiency(angleDeg));
 
     /// <summary>Seconds the dial needs to climb from <see cref="JavelinAngleStart"/> to <paramref name="angleDeg"/>.</summary>
     public static double JavelinHoldFor(double angleDeg) =>
