@@ -34,6 +34,25 @@ public class RunnerTests
     }
 
     [Fact]
+    public void PressesMadeWhileLockedAddNothingButKeepTheAlternation()
+    {
+        var r = new Runner();
+        r.Reset();
+        r.Press(1);
+        r.Locked = true;
+        r.Press(2);
+        r.Press(1);
+        r.Press(2);
+        Assert.Equal(Runner.ImpulseAlternate, r.SpeedCm);
+        Assert.Equal(1, r.PressCount);
+        r.Locked = false;
+        r.Press(1); // the last press seen in the air was RUN 2, so this one alternates
+        Assert.Equal(2 * Runner.ImpulseAlternate, r.SpeedCm);
+        r.Press(1);
+        Assert.Equal(2 * Runner.ImpulseAlternate + Runner.ImpulseRepeat, r.SpeedCm);
+    }
+
+    [Fact]
     public void RepeatingTheSameButtonIsMuchSlowerThanAlternating()
     {
         var alt = new Runner();

@@ -41,7 +41,13 @@ public sealed class Runner
 
     public void Press(int button)
     {
-        if (Locked) return;
+        if (Locked)
+        {
+            // Adds nothing, but the alternation still follows the button: the first stride after a hurdle must not be paid
+            // as a repeat just because the presses made in the air went unseen.
+            _lastButton = button;
+            return;
+        }
         PressCount++;
         double impulse = (_lastButton == 0 || _lastButton != button ? ImpulseAlternate : ImpulseRepeat) * ImpulseScale;
         _lastButton = button;

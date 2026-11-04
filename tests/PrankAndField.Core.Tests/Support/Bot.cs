@@ -111,7 +111,7 @@ public sealed class Bot
                     if (next is not null && !h.IsAirborne(_player))
                     {
                         double gap = next.X - a.X;
-                        double v = a.Runner.SpeedMetersPerSecond;
+                        double v = HurdlesSimulation.AirborneSpeed(a.Runner.SpeedCm) / 100.0; // the take-off costs speed
                         if (gap > 0 && gap < v * Rules.HurdleAirTime * 0.5) action = true;
                     }
                 }
